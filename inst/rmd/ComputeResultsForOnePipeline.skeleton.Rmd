@@ -1,0 +1,1636 @@
+---
+title: "Mass spectrometry & mRNA"
+author: "L_TAING"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    keep_md: yes
+    self_contained: yes
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+  pdf_document:
+    toc: yes
+params:
+  IsoformRegexp: sp\|[^[\|]*-[0-9]*\|
+  Pep: /data/users/ltaing/DATA_TMP/ltaing/IsoAndSpe/Spectro/TwoPass/MQ_RES/peptides.txt
+  ProteinBank: /bioinfo/users/ltaing/DATA_TMP/ltaing/IsoAndSpe/Sequences/UniprotAndProteinBank.TwoPass.KnownAndMostLikely.BlastPatched.LookalikeInUniprotNoSP.fasta
+  RefRegexp: (sp\|)|(tr\|)
+  Rescue: /bioinfo/users/ltaing/DATA_TMP/ltaing/IsoAndSpe/Sequences/TwoPass.Rescue.tsv
+  SwissProtRegexp: sp\|
+  TrEmbl: tr\|
+  Type: Two Pass
+  AllLogs: /data/users/ltaing/DATA_TMP/ltaing/IsoAndSpe/Sequences/TwoPass.log
+  VERBOSE: yes
+  mRNARegexp: strngt
+  PEPTIDES_PART: TRUE
+  DEBUG: FALSE
+---
+<style>
+a:link {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+</style> 
+<!-- Parameters description -->
+<!-- Type: -->
+<!--   -Type of analysis, -->
+<!--   -String [Hisat2,TwoPass, OnePass] -->
+<!-- ProteinBank: -->
+<!--   -File that had been used for the peptide search -->
+<!--   -Fasta file -->
+<!--     -non rerundant sequence -->
+<!--       -Meaning that if the same sequence belongs to several entries, all entries should appears -->
+<!--     -depending of the chosen protocol it can contain -->
+<!--       +SwissProt canonical (even if they do not match a Translated Longuest ORF) -->
+<!--       +SwissProt - Isoforms (if they match a) -->
+<!--       +Uniprot - TrEMBL -->
+<!--       +Translated Longuest ORF of each transcript identified -->
+<!-- PEP: Peptides file, maxquant output -->
+<!-- - Use data.table::fread -->
+<!--   - due to space present in the header names -->
+<!--   - possibly a very large file (> 1 Go) -->
+<!-- - will be use to place the peptide in the sequence -->
+<!-- -migth think about filtering it -->
+<!-- Rescue: Blast file -->
+<!--   - tsv file -->
+<!--   - outfmt "6 qseqid qlen qstart qend qseq sseqid sstart send slen sseq length mismatch gaps evalue bitscore" -->
+<!--   - KnownBank -->
+<!-- RefRegexp: "(sp\\|)|(tr\\|)" -->
+<!--   - Regexp to match anything that belongs to the reference either have sp| or tr| -->
+<!-- SwissProtRegexp: "sp\\|" -->
+<!--   - Regexp to match anything that belongs to the SwissProt sp| or tr| -->
+<!-- IsoformRegexp: "sp\\|[^[\\|]*-[0-9]*\\|" -->
+<!--   - Regexp to match anything that belongs to the Isoform  -->
+<!-- TrEmbl: "tr\\|" -->
+<!--   - Regexp to match anything that belongs to the TrEmbl -->
+<!-- mRNARegexp: "strngt" -->
+<!--   - Regexp to match anything that belongs to the mrna entries -->
+
+<!--To be remove after presentation-->
+
+# Medulloblastoma
+
+* <a href="https://www.cancer.gov/rare-brain-spine-tumor/tumors/medulloblastoma">Brain Child Tumor</a>
+
+* 4 subtypes:
+
+  + WNT (5 patients)
+
+  + SHH (10 patients)
+
+  + Group 3 (10 patients)
+
+  + Group 4 (14 patients)
+
+  + ~12 fractions per patient
+
+  + In this present study: 4 G3 patients / 4 G4 patients 
+
+* Datas:
+
+  + RNA-Seq stranded pair-end
+
+  + Mass Spec SILAC .raw
+
+<!--/To be remove after presentation-->
+
+
+```{r setup,message=FALSE}
+library("data.table",quietly=TRUE,verbose=FALSE)
+#Read big files
+library("Biostrings",quietly=TRUE,verbose=FALSE)
+#Read fasta files
+library("limma",quietly=TRUE,verbose=FALSE)
+#make some pretty Venn Diagram
+library("ggplot2",quietly=TRUE,verbose=FALSE)
+#make some pretty plot
+library("viridis",quietly=TRUE,verbose=FALSE)
+#make pretty intersection genomic range
+library("GenomicRanges",quietly=TRUE,verbose=FALSE)
+#Pretty colors
+library("DT",quietly=TRUE,verbose=FALSE)
+#make some fancy HTML table for HTML output
+library("treemap")
+#make some graph
+library("DiagrammeR")
+#make some histogram
+library("plotly")
+
+library("knitr",quietly=TRUE,verbose=FALSE)
+library("kableExtra",quietly=TRUE,verbose=FALSE)
+
+ProteinBank<-readAAStringSet(params$ProteinBank)
+#The file that have been used for the mass spec search
+Pep<-fread(params$Pep)
+#The peptide Search Using MaxQuant 
+Rescue<-read.table(params$Rescue,sep="\t",header=TRUE,quote="\"")
+#The fasta file of the MrnaEntries that did not have a perfect match in the Whole Uniprot
+
+SEQUENCES_NAMES<-names(ProteinBank)
+#Name of the fasta entries in UNIPROT
+#cat(params$RefRegexp,"\n")
+#cat(params$mRNARegexp,"\n")
+#Just to check out the regexp and how it will be interpreted by R
+UNIPROT_BOOL<-intersect(
+    grep(",Blast=",
+         SEQUENCES_NAMES,
+         invert=TRUE),
+    grep(params$RefRegexp,
+         SEQUENCES_NAMES)
+  )
+#The References names in the Used protein bank
+STRINGTIE_BOOL<-grep(params$mRNARegexp,SEQUENCES_NAMES)
+#The Mrna names in the Used protein bank
+
+#Classic Venn Diagram trick
+#All the names 2 columns, vennCounts, Diagram 
+SequencesMatrix<-matrix(0,
+  ncol=2,
+  nrow=length(SEQUENCES_NAMES)
+)
+rownames(SequencesMatrix)<-SEQUENCES_NAMES
+colnames(SequencesMatrix)<-c("Reference","mRNA")
+SequencesMatrix[UNIPROT_BOOL,"Reference"]<-1
+SequencesMatrix[STRINGTIE_BOOL,"mRNA"]<-1
+SequencesCounts<-vennCounts(SequencesMatrix)
+
+
+# protein names that came from mRNA 
+PROTEINBANK_MRNA_NAMES<-names(ProteinBank)[grep(params$mRNARegexp,
+                                                     names(ProteinBank))]
+# protein names that came from Swissprot
+# i.e. either swissprot canonical that are unperfectly present or isoform that had a blast HIT
+SWISSPROT.UNMATCHED<-names(ProteinBank)[
+  grep(
+    "^sp",
+    names(ProteinBank)
+    )
+  ]
+# Names of the mRNA that have a perfect match with an entry in UNIPROT
+PerfectMatch<-PROTEINBANK_MRNA_NAMES[grep(",UNIPROT=",
+                                              PROTEINBANK_MRNA_NAMES)]
+# Names of the mRNA that have a perfect match with an entry in UNIPROT
+# that is not a TREMBL
+# or and swissprot isoform
+PerfectMatch.SP.Canonical<-PerfectMatch[intersect(grep("-[0-9]+\\|",
+                                                       PerfectMatch,
+                                                       invert=TRUE),
+                                                  grep("tr\\|",
+                                                       PerfectMatch,
+                                                       invert=TRUE))]
+#Isoform perfect match
+PerfectMatch.SP.Isoform<-PerfectMatch[intersect(grep("-[0-9]+\\|",
+                                                       PerfectMatch),
+                                                grep("tr\\|",
+                                                       PerfectMatch,
+                                                       invert=TRUE))]
+#TrEMBL perfect match
+PerfectMatch.TR<-PerfectMatch[grep("tr\\|",PerfectMatch)]
+
+#names of mRNA that do not have a perfect match but a blast hit in UNIPROT
+BLAST.Hits<-PROTEINBANK_MRNA_NAMES[grep(",Blast=",
+                                              PROTEINBANK_MRNA_NAMES)]
+BLAST.Hits.SP.Canonical<-BLAST.Hits[intersect(grep("-[0-9]+\\|",
+                                                       BLAST.Hits,
+                                                       invert=TRUE),
+                                                  grep(",Blast=tr\\|",
+                                                       BLAST.Hits,
+                                                       invert=TRUE))]
+BLAST.Hits.SP.Isoform<-BLAST.Hits[grep("-[0-9]+\\|",
+                                       BLAST.Hits)]
+BLAST.Hits.TR<-BLAST.Hits[grep(",Blast=tr\\|",
+                               BLAST.Hits)]
+
+#Those who do not match anything neither in UNIPROT nor BLAST
+Unknown<-PROTEINBANK_MRNA_NAMES[intersect(grep(",UNIPROT=",
+                                              PROTEINBANK_MRNA_NAMES,
+                                              invert=TRUE),
+                                         grep(",Blast=",
+                                              PROTEINBANK_MRNA_NAMES,
+                                              invert=TRUE))]
+
+
+#Dataframe long format
+ProteinBank.Counts<-data.frame(
+  Match=c(rep("Perfect match",3),
+          rep("Blast hit",3),
+          "unknown"),
+  Form=c(rep(c("Canonical",
+               "Isoform",
+               "TrEMBL"),2),
+         "unknown"),
+  Effectif=c(length(PerfectMatch.SP.Canonical),
+             length(PerfectMatch.SP.Isoform),
+             length(PerfectMatch.TR),
+             length(BLAST.Hits.SP.Canonical),
+             length(BLAST.Hits.SP.Isoform),
+             length(BLAST.Hits.TR),
+             length(Unknown))
+)
+
+#The names of the proteins that are related to UNIPROT either associated to an mRNA or reinjected.
+UNIPROT_NAMES<-names(ProteinBank)[
+    grep(params$RefRegexp,names(ProteinBank))
+  ]
+UP_MATCH<-grep(",UNIPROT=",UNIPROT_NAMES)
+UP_BLAST<-grep(",Blast=",UNIPROT_NAMES)
+
+UP_Access_ID<-unlist(lapply(UNIPROT_NAMES,
+                     function(x){
+                       unlist(strsplit(
+                         x,
+                         split="\\|"))[2]
+                       }
+                     ))
+UNIPROT_Presence.Matrix<-matrix(0,
+                                nrow=length(UP_Access_ID),
+                                ncol=2)
+rownames(UNIPROT_Presence.Matrix)<-UP_Access_ID
+colnames(UNIPROT_Presence.Matrix)<-c("Match","Blast")
+UNIPROT_Presence.Matrix[UP_MATCH,"Match"]<-1
+UNIPROT_Presence.Matrix[UP_BLAST,"Blast"]<-1
+UNIPROT_Presence.DF<-data.frame(UNIPROT_Presence.Matrix)
+UNIPROT_Presence.DF$Uniprot_Entry<-UP_Access_ID
+UNIPROT_Presence.collapsed.DF<-aggregate(
+  UNIPROT_Presence.DF[
+    ,
+    c("Match","Blast")
+    ],
+  by=list(UNIPROT_Presence.DF$Uniprot_Entry),
+  FUN=sum)
+UNIPROT_Presence.collapsed.counts<-vennCounts(
+  UNIPROT_Presence.collapsed.DF[
+    ,c("Match","Blast")])
+```
+
+Protein bank file: **`r params$ProteinBank`**, obtained from the **`r params$Type`** protocol.  
+Peptide file: **`r params$Pep`**, MaxQuant peptide file using the Protein bank file.  
+
+# Protein bank file {.tabset}
+
+Rationale for the protein bank construction.
+
+The idea is to build a protein bank that is the closest to the mRNA rna-seq results. In this present study we will focus mainly on Isoform. From these isoforms and also UNIPROT knowlegde, we can produce a protein bank composed of:
+
+* **D:** The main part are the **mRNA with an ORF that match perfectly**, meaning that those proteins are present in both the mRNA and also the UNIPROT databank (either canonical, isoforms or TrEMBL)
+
+* **E:** The Swissprot Canonical part consist of Canonical entries that did not perfectly match with the CDS from the MRNA. Since the swissprot Canonical would have constitute the **regular database** for the mass spectrometry search, we consider it necessary to include all the missing ones of our approach.  
+
+* **C** and **B**: The blast parts consists of the longuest ORFS from the mRNA that once translated do not have a perfect match in UNIPROT, but have a blast hit (**C**). Based on previous observations and experiment, it has been decided that theses LORFs would be put in competition with their Subject hits in UNIPROT (**D**) to overcome some flaws in the mRNA part.
+
+* **A**: The LORF that neither match nor have a blast hit with anything. 
+
+
+<!-- The chunk below is a graphical representation of the pipeline from the ISOFORM gtf file to the Protein Bank, including perfect or partial annotation, and also a few uniprot entries. -->
+
+```{r fig.width=5}
+##
+#Info file is supposed to be a 3 columns tsv
+# is composed of differents logs spawning accros the whole pipeline
+# the first column the flag is "INFO" to be able to grep the line
+# the column 2 and 3 called Variable and value are similar to a long data frame 
+#
+
+Info<-read.table(params$AllLogs,
+                 header=FALSE,
+                 sep="\t",
+                 col.names = c("FLAG","Variable","value"))
+
+#Some pretty colors
+GraphPalette<-viridis(4,alpha=0.6)
+mRNAColor<-GraphPalette[1]
+UniprotColor<-GraphPalette[2]
+ActionColor<-GraphPalette[3]
+ProteinBankColor<-GraphPalette[4]
+
+#Get the numbers
+N_mRNA<-as.numeric(as.vector(Info[Info$Variable=="mRNA_length","value"]))
+N_ORFS<-as.numeric(as.vector(Info[Info$Variable=="All_ORFs_non_disjoint","value"]))
+N_no_match<-as.numeric(as.vector(Info[Info$Variable=="LORFs_without_UNIPROT_perfect_match","value"]))
+N_UNIPROT<-as.numeric(as.vector(Info[Info$Variable=="UNIPROT_length","value"]))
+N_SP_whithout_perfect_match<-as.numeric(as.vector(Info[Info$Variable=="Swissprot_canonical_without_mRNA","value"]))
+N_canonical<-as.numeric(as.vector(Info[Info$Variable=="Swissprot","value"]))
+N_isoform<-as.numeric(as.vector(Info[Info$Variable=="Isoforms","value"]))
+N_TrEMBL<-as.numeric(as.vector(Info[Info$Variable=="TrEMBL","value"]))
+N_ProteinBank<-as.numeric(as.vector(Info[Info$Variable=="Protein_Bank","value"]))
+N_BLAST_hit<-as.numeric(as.vector(Info[Info$Variable=="Blast_Hits","value"]))
+N_unknown<-length(Unknown)
+N_match<-length(UP_MATCH)
+N_Isoform_TrEBML_BLAST_hit<-as.numeric(as.vector(Info[Info$Variable=="Uniprot_add_suspect","value"]))
+
+
+#DiagrammeR stuff
+# presentation https://rich-iannone.github.io/DiagrammeR/graphviz_and_mermaid.html
+# options https://graphviz.gitlab.io/_pages/doc/info/attrs.html
+# From what I understood
+#  GrViz will interpret some text to produce the graph in a HTML widget
+#   - To include the numbers, we make a string with every informations, the numbers are formated to be easier to read
+#  shape, fontname, style, fontsize, width, height,fillcolor and label are self explainatory
+# overlap : Not so sure but supposed to be nodes overlap
+# rankdir : General orientation of the graph LR Left to Right
+# splines : how the edges should be drawn
+#
+# keywords: graph, node, edge
+# [] attributes/values "," separated
+# nodes are ; separated
+# edge are space separated
+#  node "From" name -> node "To" name
+# 
+# Ranks part
+# in the end of the graph declaration 
+# the ranks are some kind of mapping of the graph
+# for example
+#    { rank=same; A; B; C; 2; } 
+#   means that nodes A B C and 2 share the same Left Right alignement
+#
+# width 768 to fit the final html file 
+# height 432 to keep a 16:9 ratio
+#
+grViz(paste("
+digraph boxes_and_circles {
+
+  # a 'graph' statement
+  graph [overlap = true,
+        fontsize =24,
+        rankdir = LR,
+        splines=ortho]
+
+  # several 'node' statements
+  node [shape = box,
+        fontname = Helvetica,
+        style = filled,
+        fontsize =24.0]
+  E[label=\"mRNA\nn: ",
+  formatC(N_mRNA,big.mark=" ",format="d"),
+  "\",fillcolor=\"",
+  mRNAColor,
+  "\",width=2,height=3];
+  F[label=\"All ORFs\nn: ",
+  formatC(N_ORFS,big.mark=" ",format="d"),
+  "\",fillcolor=\"",
+  mRNAColor,
+  "\",width=2,height=3];
+  I[label=\"mRNA\nwithout a ORF\nthat match\nperfectcly\nn: ",
+  formatC(N_no_match,big.mark=" ",format="d"),
+  "\",fillcolor=\"",
+  mRNAColor,
+  "\"];
+  J[label=\"Longuest\nORF\nper mRNA\nn: ",
+  formatC(N_no_match,big.mark=" ",format="d"),
+  "\",fillcolor=\"",
+  mRNAColor,
+  "\"];
+  
+  A[label=\"Swissprot\ncanonical\nn: ",
+  formatC(N_canonical,big.mark=" ",format="d"),
+  "\",fillcolor=\"",
+  UniprotColor,
+  "\",width=3];
+  B[label=\"Swissprot\nisoform\nn: ",
+  formatC(N_isoform,big.mark=" ",format="d"),
+  "\",fillcolor=\"",UniprotColor,"\",width=3];
+  C[label=\"TrEMBL\nn: ",
+  formatC(N_TrEMBL,big.mark=" ",format="d"),
+  "\",fillcolor=\"",UniprotColor,"\",width=3];
+  D[label=\"UNIPROT\nn: ",
+  formatC(N_UNIPROT,big.mark=" ",format="d"),
+  "\",fillcolor=\"",UniprotColor,"\",width=3,height=3];
+  M[label=\"Protein bank\nfor\nMaxQuant\nn: ",
+  formatC(N_ProteinBank,big.mark=" ",format="d"),
+  "\",fillcolor=\"",ProteinBankColor,"\",height=9]
+  
+  K[label=\"C: LORF\nwith\na blast hit\nn: ",
+  formatC(N_BLAST_hit,big.mark=" ",format="d"),
+  "\",fillcolor=\"",mRNAColor,"\",width=3.5];
+  L[label=\"A: Unknown\nLORF\nn: ",
+  formatC(N_unknown,big.mark=" ",format="d"),
+  "\",fillcolor=\"",mRNAColor,"\",width=3.5];
+  H[label=\"D: mRNA\nwith a ORF\nthat\nmatch perfectly\nn: ",
+  formatC(N_match,big.mark=" ",format="d"),
+  "\",fillcolor=\"",UniprotColor,"\",width=3.5];
+  G[label=\"B: Isoform\nTrEmbl\nBlast HIT\nn: ",
+  formatC(N_Isoform_TrEBML_BLAST_hit,big.mark=" ",format="d"),
+  "\",fillcolor=\"",UniprotColor,"\",width=3.5];
+  N[label=\"E: Swissprot Canonical\nwithout\na perfect Match\nn: ",
+  formatC(N_SP_whithout_perfect_match,big.mark=" ",format="d"),
+  "\",fillcolor=\"",UniprotColor,"\",width=3.5];
+  
+  node [shape = plaintext,fillcolor=\"",ActionColor,"\"];
+  1[label=\"Concat\nkeep only\nunique\nsequence\",height=3]; 2[label=\"Find ORFs\"];
+  3[label=\"Perfect\nMatch\",height=4]; 4[label=\"Select\"]; 5[label=\"BLAST\",height=4]
+
+  # several 'edge' statements
+  edge [len=2.0]
+  E->2 2->F F->3 
+  3->I 4->J J->5 
+  I->4 
+  A->1 B->1 C->1 1->D 
+  D->3 
+  D->5 5->K
+  5->G 5->L L->M G->M K->M H->M N->M
+  3->H
+  3->N
+  
+  { rank=same; A; B; C; 2; }
+  { rank=same; F; 1; }
+  { rank=same; D; 3; }
+  { rank=same; I;}
+  { rank=same; L; K; G; H; N}
+}"),width=768,height=432)
+```
+
+
+## Protein bank {.tabset}
+
+### Width
+
+Length histogram of the protein of the bank.
+
+```{r}
+#plotly histogram
+plot_ly(x =~ width(ProteinBank),
+  type="histogram")
+```
+
+### Venn diagram
+
+The protein bank file contains **`r formatC(length(ProteinBank),big.mark=" ",format="d")`** proteins.  
+The reference sequences are characterized by the "**`r paste(params$RefRegexp)`**" regular expression.  
+The mRNA sequences are characterized by the "**`r paste(params$mRNARegexp)`**" regular expression.  
+
+```{r }
+
+vennDiagram(SequencesCounts,
+            main="Perfect match",
+            names=c("From UNIPROT","From mRNA"))
+
+```
+
+
+## mRNA Treemap
+
+The treemap represent the **`r formatC(length(STRINGTIE_BOOL),big.mark=" ",format="d")` proteins from the mRNAs** of the protein bank. They are divided in 3 categories:
+
+* MATCH: those who match perfectly an UNIPROT entry (n=**`r formatC(length(PerfectMatch),big.mark=" ",format="d")`**)
+
+* BLAST: those who do not match perfectly an UNIPROT entry but share a BLAST hit.
+  The blast hit range from **part of the UNIPROT entry** to a **single mismatch** (n=**`r formatC(length(BLAST.Hits),big.mark=" ",format="d")`**)
+
+* UNKNOWN: those who neither match an UNIPROT entry nor share a BLAST hit (n=**`r formatC(length(Unknown),big.mark=" ",format="d")`**)
+
+
+```{r }
+
+treemap::treemap(ProteinBank.Counts,
+        index=c("Match","Form"),
+        vSize = "Effectif",
+        vColor="Form",
+        type="index")
+```
+
+## Uniprot representation
+From all the UNIPROT entries in the database, how do they interact with our mRNAs?  Do they match perfectly some of our mRNA or do they have a BLAST hit? 
+
+```{r}
+vennDiagram(UNIPROT_Presence.collapsed.counts,
+            "Uniprot Coverage")
+```
+
+
+# Mass spectrometry  {.tabset}
+
+The protein bank obtained from the mRNA pipeline is then used for proteomic analysis. The spectrum have been searched with MaxQuant. 
+
+## Peptide match
+<!-- Working on leading razon Protein -->
+We focus here on the leading razor protein. The leading razor protein is the protein that MaxQuant consider as the most likely when a peptide match several proteinor isoforms, based on the numer of peptide matching the protein.  
+
+This is the repartition of the leading razor proteins:
+
+* Contaminants are decoy artificially created by MaxQuant
+
+* Only in Uniprot are proteins from Uniprot protein bank
+
+* Both in UNIPROT and mRNA are the protein that we found both in UNIPROT and also from mRNA
+
+* Only in mRNA are the protein that we found only in mRNA
+
+
+
+```{r}
+#Get the contaminant
+ContamsInMS<-unique(Pep[grep("(CON|REV)__",`Leading razor protein`),`Leading razor protein`])
+#Discard the contaminant
+ProteinsInMS.NoContam<-unique(Pep[grep("(CON|REV)__",`Leading razor protein`,invert=TRUE),`Leading razor protein`])
+#How many
+N.ContamsInMS<-length(ContamsInMS)
+#The idea is that if the entry is only present in SwissProt it will be featured as the first on the list, it doesn't matter if it match any TR or any oter swissprot isoform
+ProteinsInMS.NoContam.SwissprotOnly<-ProteinsInMS.NoContam[grep("^sp\\|",ProteinsInMS.NoContam)]
+N.Uniprot<-length(ProteinsInMS.NoContam.SwissprotOnly)
+
+#Leading Razor Protein that match MRNA
+ProteinsInMS.NoContam.Mrna<-ProteinsInMS.NoContam[grep("^strngt",ProteinsInMS.NoContam)]
+
+#Of those who matched the mrna how many have a perfect match in the Uniprot database
+ProteinsInMS.NoContam.Mrna.Both<-ProteinsInMS.NoContam.Mrna[grep("UNIPROT=",ProteinsInMS.NoContam.Mrna)]
+N.Both<-length(ProteinsInMS.NoContam.Mrna.Both)
+
+#Of those who match the Mrna how many do not match anything in UNIPROT 
+ProteinsInMS.NoContam.Mrna.MrnaOnly<-ProteinsInMS.NoContam.Mrna[grep("UNIPROT=",ProteinsInMS.NoContam.Mrna,invert=TRUE)]
+N.Mrna<-length(ProteinsInMS.NoContam.Mrna.MrnaOnly)
+
+#Some Unpretty representation of our Leading Razon Protein Situation
+df <- data.frame(group=factor(c("Contaminants",
+    "Only in Uniprot",
+    "Both in UNIPROT and MRNA",
+    "Only in MRNA"),
+    levels=c("Contaminants",
+      "Only in Uniprot",
+      "Both in UNIPROT and MRNA",
+      "Only in MRNA")),
+    Effectif=c(N.ContamsInMS,
+    N.Uniprot,
+    N.Both,
+    N.Mrna))
+datatable(df,rownames = FALSE)
+
+g<-ggplot(df, aes(x = "", y = Effectif, fill = group)) +
+  geom_col(width = 1) +
+  scale_fill_manual(values = viridis(4)) +
+  labs(title = "Two pass/Leading Razon protein")+
+  theme_bw()
+print(g)
+```
+
+
+## Leading Razor Protein
+<!-- Working on leading razon Protein -->
+
+Of all the **`r length(unique(ProteinsInMS.NoContam))`**, what kind of uniprot entry are they and where do they come from?
+
+Uniprot entry:  
+
+* The **canonical** correspond to the usual database for proteomic analysis. They consist of manually curated sequences.
+
+* The **Isoform** correspond to other version canonical entries, alternatives sequences, Insertions/Deletions.
+
+* The **TrEMBL** consist of automaticaly annotated proteins.
+
+Origin:
+
+* **mRNA Perfect Match** corresponds to Uniprot entries with an open reading frame from a mRNA that once translated match perfectly to an Uniprot entry.
+
+* **Reinjected** corresponds to the Uniprot Blast hit of the longuest open reading frame from a mRNA that once translated match unperfectly to an Uniprot entry. That Uniprot entry is then reinjected to the Protein Bank. It will be put in competition with the longuest ORF. We also decided to to reinject the Uniprot canonical entries that were not present in the protein bank as a precaution.
+
+* **mRNA blast** correspond to protein obtained from the longuest orf that match unperfectly and is still choosen over it's competition.
+
+* **unknown** corresponds to longuest open reading frame that does not match anything in Uniprot. 
+
+
+```{r}
+ProteinsInMS.NoContam.Swissprot<-ProteinsInMS.NoContam[grep("^sp\\|",ProteinsInMS.NoContam)]
+
+ProteinsInMS.NoContam.Swissprot.canonical<-ProteinsInMS.NoContam.Swissprot[
+  grep("^sp\\|[^-]*\\|",
+       ProteinsInMS.NoContam.Swissprot)]
+ProteinsInMS.NoContam.Swissprot.Iso<-ProteinsInMS.NoContam.Swissprot[
+  grep("^sp\\|[^-]*\\|",
+       ProteinsInMS.NoContam.Swissprot,
+       invert=TRUE)]
+ProteinsInMS.NoContam.TR<-ProteinsInMS.NoContam[
+  grep("^tr\\|",
+       ProteinsInMS.NoContam)]
+
+
+
+ProteinsInMS.NoContam.mRNA<-ProteinsInMS.NoContam[grep("^st",ProteinsInMS.NoContam)]
+ProteinsInMS.NoContam.mRNA.PerfectMatch<-ProteinsInMS.NoContam.mRNA[grep("UNIPROT=",ProteinsInMS.NoContam.mRNA)]
+ProteinsInMS.NoContam.mRNA.PerfectMatch.canonical<-ProteinsInMS.NoContam.mRNA.PerfectMatch[
+  grep(
+    "UNIPROT=sp\\|[^-]*\\|",                                                                  
+    ProteinsInMS.NoContam.mRNA.PerfectMatch
+       )]
+ProteinsInMS.NoContam.mRNA.PerfectMatch.Iso<-ProteinsInMS.NoContam.mRNA.PerfectMatch[
+  grep(
+    "UNIPROT=sp\\|[^-]*-[^-]*\\|",                                                                  
+    ProteinsInMS.NoContam.mRNA.PerfectMatch
+       )]
+ProteinsInMS.NoContam.mRNA.PerfectMatch.TR<-ProteinsInMS.NoContam.mRNA.PerfectMatch[
+  grep(
+    "UNIPROT=tr\\|",                                                                  
+    ProteinsInMS.NoContam.mRNA.PerfectMatch
+       )]
+
+
+ProteinsInMS.NoContam.mRNA.LookAlike<-ProteinsInMS.NoContam.mRNA[
+  grep("Blast=",
+       ProteinsInMS.NoContam.mRNA)]
+ProteinsInMS.NoContam.mRNA.LookAlike.canonical<-ProteinsInMS.NoContam.mRNA.LookAlike[
+  grep(
+    "Blast=sp\\|[^-]*\\|",                                                                  
+    ProteinsInMS.NoContam.mRNA.LookAlike
+       )]
+ProteinsInMS.NoContam.mRNA.LookAlike.Iso<-ProteinsInMS.NoContam.mRNA.LookAlike[
+  grep(
+    "Blast=sp\\|[^-]*-[^-]*\\|",                                                                  
+    ProteinsInMS.NoContam.mRNA.LookAlike
+       )]
+ProteinsInMS.NoContam.mRNA.LookAlike.TR<-ProteinsInMS.NoContam.mRNA.LookAlike[
+  grep(
+    "Blast=tr\\|",                                                                  
+    ProteinsInMS.NoContam.mRNA.LookAlike
+       )]
+
+ProteinsInMS.NoContam.mRNAOnly<-ProteinsInMS.NoContam.mRNA[
+  intersect(
+    grep("UNIPROT=",
+         ProteinsInMS.NoContam.mRNA,
+         invert=TRUE),
+    grep("Blast=",
+         ProteinsInMS.NoContam.mRNA,
+         invert=TRUE)
+  )
+]
+
+LeadingRazor.DF<-data.frame(Origin=c(rep("Reinjected",3),
+                                     rep("mRNAPerfectMatch",3),
+                                     rep("mRNABlast",3),
+                                     "mRNA"
+                                     ),
+                            Database=c(
+                              rep(
+                                rep(
+                                  c("canonical",
+                                    "isoform",
+                                    "TrEMBL")
+                                ),
+                                3
+                              ),"unknown"),
+                            Effectif=rep(
+                              0,
+                              10
+                              )
+                            )
+                                     
+LeadingRazor.DF[LeadingRazor.DF$Origin=="Reinjected" &
+                  LeadingRazor.DF$Database=="canonical",
+                "Effectif"]<-length(ProteinsInMS.NoContam.Swissprot.canonical)
+LeadingRazor.DF[LeadingRazor.DF$Origin=="Reinjected" &
+                  LeadingRazor.DF$Database=="isoform",
+                "Effectif"]<-length(ProteinsInMS.NoContam.Swissprot.Iso)
+LeadingRazor.DF[LeadingRazor.DF$Origin=="Reinjected" &
+                  LeadingRazor.DF$Database=="TrEMBL",
+                "Effectif"]<-length(ProteinsInMS.NoContam.TR)
+
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNAPerfectMatch" &
+                  LeadingRazor.DF$Database=="canonical",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNA.PerfectMatch.canonical)
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNAPerfectMatch" &
+                  LeadingRazor.DF$Database=="isoform",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNA.PerfectMatch.Iso)
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNAPerfectMatch" &
+                  LeadingRazor.DF$Database=="TrEMBL",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNA.PerfectMatch.TR)
+
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNABlast" &
+                  LeadingRazor.DF$Database=="canonical",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNA.LookAlike.canonical)
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNABlast" &
+                  LeadingRazor.DF$Database=="isoform",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNA.LookAlike.Iso)
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNABlast" &
+                  LeadingRazor.DF$Database=="TrEMBL",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNA.LookAlike.TR)
+
+LeadingRazor.DF[LeadingRazor.DF$Origin=="mRNA" &
+                  LeadingRazor.DF$Database=="unknown",
+                "Effectif"]<-length(ProteinsInMS.NoContam.mRNAOnly)
+datatable(LeadingRazor.DF,rownames = FALSE)
+treemap(LeadingRazor.DF,
+        index=c("Database","Origin"),
+        vSize = "Effectif",
+        type="index",
+        align.labels = list(c("center","center"),c("left","top")))
+
+```
+
+# Isoforms
+
+We isolated the leading razor protein identified as isoforms with at least a proteotypic peptide, meaning a peptide that match only one protein.
+
+How to read the table
+
+The **name** correspond to the Fasta entry in the ProteinBank that is the most parcimonious hypothesis able to explain all listed peptides.
+
+* The Stringtie flag . Gene number . isoform 
+
+* The **Start** correspond to the ATG position in the mRNA
+
+* The **Stop** correspond to the codon STOP position in the mRNA
+
+* The **Frame** correspond to the frame with the 3' as reference
+
+* The **Flag** correspond to the ORF rank by decreasing size i.e. flag=1 is the longuest ORFs
+
+* The **UNIPROT** correspond to the UNIPROT entry that match perfectly this
+
+The name field contains a HTML link to the UNIPROT online sequence entry.
+
+The **N_Peptides** contains the number of peptides that match the Protein.
+
+The table have hidden fields accessible through the <span style="color:green">**green button**</span> on the left before each name. It will unhide some supplementary informations about the protein. You can hide these informations through the <span style="color:red">**red button**</span>. These supplementary informations consists of:
+
+The **MatchProtein** contains the names of all the proteins that could have been match with theses peptides.
+
+The **N_MatchProtein** contains the number of proteins match that could have been match with theses peptides.
+
+The **PEPTIDES** tables contains all the informations relatives to the peptides.
+
+The **SequenceInHTML** is a fasta friendly representation of the protein sequence. The red parts are the peptides matchs on the sequence. They might be some overlaping peptides due to misscleavage.
+
+```{r}
+
+
+Isoforms<-c(ProteinsInMS.NoContam.mRNA.PerfectMatch.Iso,
+ProteinsInMS.NoContam.Swissprot.Iso)
+
+Isoforms.Proteotypic<-Isoforms[Isoforms %in% Pep$Proteins]
+Pep.Iso<-data.frame(Pep[Pep$`Leading razor protein` %in% Isoforms.Proteotypic,])
+ShortNames<-c("Leading.razor.protein",
+              "Proteins",
+              "Start.position",
+              "End.position",
+              "PEP",
+              "Sequence")
+Pep.Iso.Short<-Pep.Iso[,ShortNames]
+colnames(Pep.Iso.Short)[6]<-"PeptideSequence"
+ProteinBank.Iso<-ProteinBank[gsub(" .*","",names(ProteinBank)) %in% Isoforms.Proteotypic]
+IsoSequencesOfInterest<-ProteinBank[gsub(" .*","",names(ProteinBank)) %in% Isoforms.Proteotypic]
+IsoSequencesOfInterest.DF<-data.frame(
+  sequence=as.vector(IsoSequencesOfInterest),
+  shortName=gsub(" .*",
+                 "",
+                 names(IsoSequencesOfInterest)),
+  Name=names(IsoSequencesOfInterest))
+rownames(IsoSequencesOfInterest.DF)<-NULL
+Pep.Iso.Short.CoordPart<-aggregate(
+    Pep.Iso.Short[,c("Start.position",
+                           "End.position",
+                           "PEP",
+                           "Proteins",
+                     "PeptideSequence")],
+    by=list(Pep.Iso.Short$Leading.razor.protein),
+    function(x){
+      paste0(x,
+        collapse="/")
+    }
+  )
+  Pep.Iso.data.table<-merge(Pep.Iso.Short.CoordPart,
+                                 IsoSequencesOfInterest.DF,
+                                 by.x="Group.1",
+                                 by.y="shortName")
+  Pep.Iso.data.table$Name<-lapply(X = as.vector(Pep.Iso.data.table$Name),
+                                  function(x){
+                                    Infos<-unlist(strsplit(x,"\\|"))
+                                    if(length(Infos)>=3){
+                                      LOCAL_UNIPROT_ENTRY<-gsub("-[^-]*","",Infos[2])
+                                      return(paste("<a href=\"https://www.uniprot.org/uniprot/",
+                                                   LOCAL_UNIPROT_ENTRY,
+                                                    "#sequences\" target=\"_blank\">",
+                                                   x,
+                                                   "</a>",sep=""))
+                                      
+                                    }else{
+                                      return(x)
+                                    }
+                                  })
+  Pep.Iso.data.table$SequenceInHTML<-apply(
+    Pep.Iso.data.table[,c("sequence",
+                          "Start.position",
+                          "End.position")],
+    1,
+    function(x){
+      AAs<-unlist(
+        strsplit(
+          as.vector(
+            x["sequence"]
+          ),
+          split="")
+      )
+      Starts<-as.numeric(
+        unlist(
+          strsplit(
+            x["Start.position"],
+            "/")
+        )
+      )
+      Stops<-as.numeric(
+        unlist(
+          strsplit(
+            x["End.position"],
+            "/")
+        )
+      )
+      Intervals<-reduce(IRanges(Starts,Stops))
+      AAs[start(Intervals)]<-paste("<font color=red>",
+                                   AAs[start(Intervals)],
+                                   sep="")
+      AAs[end(Intervals)]<-paste(AAs[end(Intervals)],
+                                 "</font>",
+                                 sep="")
+      
+      Blocks<-base::seq(10,length(AAs),10)
+      if(length(AAs)>60){
+        NewLines<-base::seq(60,length(AAs),60)
+        Blocks<-Blocks[!Blocks %in% NewLines]
+        AAs[NewLines]<-paste(AAs[NewLines],"</br>",sep="")
+      }
+      AAs[Blocks]<-paste(AAs[Blocks],"&nbsp;",sep="")
+      AAs[1]<-paste("<div style=\"font-family:courier;font-weight: bold\">",
+        AAs[1],
+        sep="")
+      AAs[length(AAs)]<-paste(AAs[length(AAs)],
+        "</div>",
+        sep="")
+      AAs<-paste(AAs,collapse="")
+      return(AAs)
+    })
+ Pep.Iso.data.table$PEPTIDES<-apply(Pep.Iso.data.table[,
+                                    c("Start.position",
+                                      "End.position",
+                                      "PEP",
+                                      "Proteins",
+                                      "PeptideSequence")],
+                           1,
+                           function(x){
+                             Starts<-strsplit(x=x["Start.position"],
+                                              split="/")
+                             End<-strsplit(x=x["End.position"],
+                                           split="/")
+                             PEP<-strsplit(x=x["PEP"],
+                                           split="/")
+                             Sequences<-strsplit(x=x["PeptideSequence"],
+                                                 split="/")
+                             
+                             Proteins<-strsplit(x=x["Proteins"],
+                                           split="/")
+                             Proteins<-lapply(Proteins,
+                                              function(y){
+                                                y<-gsub(";",
+                                                     " ",
+                                                     y)
+                                                y<-gsub(",[^ ]*",
+                                                     "",
+                                                     y)
+                                              y<-gsub("sp\\||tr\\|",
+                                                     "",
+                                                     y)
+                                                
+                                                y<-gsub("\\|[^ ]*",
+                                                     "",
+                                                     y)
+                                                return(y)
+                                              }
+                             )
+                             TABLE<-data.frame(Start=Starts,
+                                               End=End,
+                                               Pep=PEP,
+                                               Proteins=Proteins,
+                                               Sequences=Sequences)
+                             colnames(TABLE)<-c("Start",
+                                                "End",
+                                                "PEP",
+                                                "Proteins",
+                                                "Sequences")
+                             rownames(TABLE)<-NULL
+                             TABLE<-TABLE[
+                               order(
+                                 as.numeric(
+                                   as.vector(
+                                   TABLE$Start
+                                   )
+                                   )
+                                   
+                                 ),]
+                             scroll_box(
+                               kable_styling(
+                                 kable(TABLE,row.names = FALSE)
+                               ),
+                               fixed_thead = T,
+                               height = "150px"
+                             )
+                           })
+ Pep.Iso.data.table$MatchProtein<-lapply(
+   Pep.Iso.data.table[,
+            "Proteins"],
+   function(y){
+     y<-gsub("/",
+             " ",
+             y)
+     y<-gsub(";",
+             " ",
+             y)
+     y<-gsub(",[^ ]*",
+             "",
+             y)
+     y<-gsub("sp\\||tr\\|",
+             "",
+             y)
+     
+     y<-gsub("\\|[^ ]*",
+             "",
+             y)
+     y<-unique(unlist(strsplit(y," ")))
+     y<-paste(y,collapse = " ")
+     return(y)
+   }
+ )
+ Pep.Iso.data.table$N_Peptides<-unlist(
+    lapply(Pep.Iso.data.table$Start.position,
+      function(x){
+        return(length(unlist(strsplit(as.vector(x),"/"))))
+      }
+    )
+  )
+ Pep.Iso.data.table$N_MatchProtein<-lapply(
+   Pep.Iso.data.table[,
+            "Proteins"],
+   function(y){
+     y<-gsub("/",
+             " ",
+             y)
+     y<-gsub(";",
+             " ",
+             y)
+     y<-unique(unlist(strsplit(y," ")))
+     return(length(y))
+   }
+ )
+  Pep.Iso.data.table[,c("sequence",
+                          "Start.position",
+                          "End.position",
+                        "PEP",
+                        "Proteins","Group.1")]<-NULL
+  Pep.Iso.data.table<-Pep.Iso.data.table[,c("Name",
+                                            "N_Peptides",
+                                            "MatchProtein",
+                                            "N_MatchProtein",
+                                            "PEPTIDES",
+                                            "SequenceInHTML")]
+  Pep.Iso.data.table<-Pep.Iso.data.table[order(Pep.Iso.data.table$N_Peptides,
+                                               decreasing = TRUE),]
+  DT::datatable(Pep.Iso.data.table,
+                rownames=FALSE,
+                escape=FALSE,
+                extensions = 'Responsive'
+                )
+  
+```
+
+# Pep score
+
+**`r formatC(dim(Pep)[1],big.mark=" ")`** peptides have been identified with **`r formatC(sum(Pep[,"MS/MS Count"]),big.mark=" ")`** MS/MS. 
+
+```{r}
+ PEP.PEP<-unlist(Pep[,"PEP"])
+ names(PEP.PEP)<-NULL
+ PEP.PEP[PEP.PEP<=1e-300]<-1e-300
+ hist(-log(PEP.PEP,10),
+  breaks=seq(0,300,1),
+  xlab="-log_10(PEP)",
+  ylab="Frequency",
+  main="PEP score repartition - histogram")
+ plot(ecdf(-log(PEP.PEP,10)),
+  xlab="-log_10(PEP)",
+  main="PEP score repartition - empirical cumulative distribution")
+```
+
+# From mRNAs {.tabset}
+
+This part is focus on the protein of the bank that cames from the mRNA that do not have a perfect match.  
+
+Even though they do not have a perfect match in UNIPROT they might have a blast hit on UNIPROT.
+
+In that case the **Bold** part of the sequence correspond to the matching part of the protein sequence.
+
+If you **hover** with the mouse cursor over the bold part, the **blast informations** should appear.
+
+The <u>**underlined**</u> part corresponds to blast **missmatch** to the UNIPROT entry or potential **SAAV**. NB the used genome for generating the protein sequence is the Reference genome and may not reflect the actual polymorphism of our samples.
+
+The <mark style="background-color:yellow;padding:0;border-width:0">**yellow highlight**</mark> part correspond to an **insertion** to the UNIPROT entry.
+
+The <mark style="background-color:green;padding:0;border-width:0">**green highlight**</mark> part correspond to a **deletion** to the UNIPROT entry. The missing part is between the two highlighted Amino Acid. On hover, the missing part should appear. 
+
+The <font color=red>**red letters**</font> corresponds to the peptide match on the protein. 
+
+
+## Peptides and Proteins
+
+
+```{r eval=params$PEPTIDES_PART,echo=FALSE}
+  #The Blast File
+  #Might have to discard this part about QuerySeqId
+  Rescue$QuerySeqId<-gsub(",.*","",Rescue$QuerySeqId)
+  #Should be interesting to sort it before discard duplicate
+  Rescue<-Rescue[order(Rescue$BitScore,decreasing=TRUE),]
+  Rescue<-Rescue[!duplicated(Rescue$QuerySeqId),]
+  
+  #Create a data frame for the protein bank
+  ProteinBank.DF<-data.frame(Protein=as.vector(ProteinBank),
+    Name=names(ProteinBank))
+  rownames(ProteinBank.DF)<-NULL
+  #Due to some miss used of semi colon We need to handle things to be able to match it
+  #Will need to remove it when everything is done
+  ProteinBank.DF$Name<-gsub("[ ;].*$","",ProteinBank.DF$Name)
+  ProteinBank.DF$Name<-gsub(",.*","",ProteinBank.DF$Name)
+  #Smaller set
+  Pep.Short<-Pep[,c("Sequence",
+    "Leading razor protein",
+    "Start position",
+    "End position",
+    "PEP",
+    "Proteins",
+    "Sequence")]
+  Pep.Short<-data.frame(Pep.Short)
+  #Missused of semi colon
+  #Will need to remove it when everything is done
+  Pep.Short$Leading.razor.protein<-gsub(",.*$",
+    "",
+    Pep.Short$Leading.razor.protein)
+  Pep.Short.NoNA<-Pep.Short[!is.na(Pep.Short$Start.position),]
+  Pep.GR<-makeGRangesFromDataFrame(Pep.Short.NoNA,keep.extra.columns = FALSE,
+                                   seqnames.field = "Leading.razor.protein",
+                                   start.field = "Start.position",
+                                   end.field = "End.position")
+  Pep.GR<-reduce(Pep.GR)
+  #Big data frame
+  # The Leading razor protein will be used as peptide identificator
+  # 1 line per PSM
+  #  - redundance of information about Protein identification
+  #ProteinBank.DF$Name<-gsub(",.*","",ProteinBank.DF$Name)
+  #Pep.Short$Leading.razor.protein<-gsub(",.*","",Pep.Short$Leading.razor.protein)
+  ProteinBank.DF<-merge(ProteinBank.DF,
+    Pep.Short,
+    by.x = "Name",
+    by.y = "Leading.razor.protein",
+    sort = FALSE)
+  ProteinsInMS.NoContam.Mrna.MrnaOnly.NameInPeptide<-gsub(",.*","",ProteinsInMS.NoContam.Mrna.MrnaOnly)
+  # I will focus on the positive input of the proteogenomic approach so
+  # I will only need the information reagarding my leading razor protein
+  # Of these leading razor protein I just want those who are from the mRNA
+  # at this step the data frame is still PSM centered
+  MrnaOnlyPeptideBank<-ProteinBank.DF[ProteinBank.DF$Name %in% ProteinsInMS.NoContam.Mrna.MrnaOnly.NameInPeptide,]
+  MrnaOnlyPeptideBank<-MrnaOnlyPeptideBank[order(MrnaOnlyPeptideBank$Start.position,MrnaOnlyPeptideBank$Name),]
+  #Aggregate everythingby protein
+  # 1 line = 1 Protein
+  # 1 Protein -> 1,n PSM
+  MrnaOnly.NamePart<-unique(MrnaOnlyPeptideBank[,c("Name","Protein")])
+  MrnaOnlyPeptideBank$Proteins<-gsub(";Origin=3'",
+                                     "",
+                                     MrnaOnlyPeptideBank$Proteins)
+  MrnaOnly.CoordPart<-aggregate(
+    MrnaOnlyPeptideBank[,c("Start.position",
+                           "End.position",
+                           "PEP",
+                           "Proteins",
+                           "Sequence")],
+    by=list(MrnaOnlyPeptideBank$Protein),
+    function(x){
+      paste0(x,
+        collapse="/")
+    }
+  )
+  
+  # Just to known how many peptide match this protein
+  MrnaOnly.CoordPart$N_Peptides<-unlist(
+    lapply(MrnaOnly.CoordPart$Start.position,
+      function(x){
+        return(length(unlist(strsplit(as.vector(x),"/"))))
+      }
+    )
+  )
+  MrnaOnly<-merge(MrnaOnly.NamePart,
+    MrnaOnly.CoordPart,
+    by.x="Protein",
+    by.y="Group.1")
+  #MrnaOnly is at this moment just a digest of the pep file
+  #we will add the information concerning the Blast results
+  MrnaOnly<-merge(MrnaOnly,
+    Rescue,
+    by.x="Name",
+    by.y="QuerySeqId",
+    all.x=TRUE)
+  
+  MrnaOnly.Informations<-matrix(FALSE,nrow=length(ProteinsInMS.NoContam.Mrna.MrnaOnly.NameInPeptide),ncol=8)
+  rownames(MrnaOnly.Informations)<-as.vector(MrnaOnly$Name)
+  colnames(MrnaOnly.Informations)<-c("SAAV",
+                                     "Insertion",
+                                     "Deletion",
+                                     "SAAV_In_Peptide",
+                                     "Insertion_In_Peptide",
+                                     "Deletion_In_Peptide",
+                                     "Peptide_Not_In_Blast",
+                                     "Not_In_Blast")
+  
+  # Will produce a HTML ready to print fasta sequence
+  # 
+  #
+  #
+  
+  #
+  #
+  #
+  #DEBUG part
+  #case strngt.5186.1,start=37400,stop=37897,frame=1,flag=LonguestORF
+  # case<-"strngt.22916.1,start=29892,stop=30719,frame=2,flag=LonguestORF"
+  # MrnaOnly<-MrnaOnly[MrnaOnly$Name==case,]
+  # Rescue<-Rescue[Rescue$QuerySeqId==case,]
+  # MrnaOnly<-as.matrix(MrnaOnly)
+  # x<-as.vector(MrnaOnly[1,])
+  # names(x)<-colnames(MrnaOnly)
+  
+  MrnaOnly$SequenceInHTML<-apply(MrnaOnly,1,function(x,SpectralGRanges){
+      ProteinSequence<-unlist(strsplit(as.vector(x["Protein"]),""))
+      Starts<-as.numeric(unlist(strsplit(x["Start.position"],"/")))
+      Stops<-as.numeric(unlist(strsplit(x["End.position"],"/")))
+      Intervals<-reduce(IRanges(Starts,Stops))
+
+      
+      ProteinSequence[start(Intervals)]<-paste("<font color=red>",
+        ProteinSequence[start(Intervals)],
+        sep="")
+      ProteinSequence[end(Intervals)]<-paste(ProteinSequence[end(Intervals)],
+        "</font>",
+        sep="")
+      
+      if(!is.na(x["SubjectSeqId"])){
+        if(sum(c(Starts<as.numeric(as.vector(x["QueryStart"])),
+               Stops>as.numeric(as.vector(x["QueryEnd"]))))>0){
+                    MrnaOnly.Informations[as.vector(x["Name"]),"Peptide_Not_In_Blast"]<<-TRUE
+        }
+        QuerySequence<-as.vector(x["QuerySequence"])
+        SubjectSequence<-as.vector(x["SubjectSequence"])
+        Query<-unlist(strsplit(QuerySequence,""))
+        Subject<-unlist(strsplit(SubjectSequence,""))
+            
+        DeletionsInQuery<-which(Query=="-")
+        if(length(DeletionsInQuery)>0){
+          DeletionsInQuery<-reduce(IRanges(DeletionsInQuery,
+                                           DeletionsInQuery))
+          Deletions.Sequences<-substring(SubjectSequence,
+                                         first=start(DeletionsInQuery),
+                                         last=end(DeletionsInQuery))
+          ShiftInducedByDeletions<-c(0,cumsum(width(DeletionsInQuery)))
+          ShiftInducedByDeletions<-ShiftInducedByDeletions[-length(ShiftInducedByDeletions)]
+          DeletionsInQuery<-shift(DeletionsInQuery,-ShiftInducedByDeletions)
+          EdgesOfTheDeletionsInProtein<-IRanges(start(DeletionsInQuery)-1,
+                                                start(DeletionsInQuery))
+          EdgesOfTheDeletionsInProtein<-shift(EdgesOfTheDeletionsInProtein,
+                as.numeric(as.vector(x["QueryStart"]))-1)
+          ProteinSequence[start(EdgesOfTheDeletionsInProtein)]<-paste("<mark style=\"background-color:green;padding:0;border-width:0\" title=\"Deletion: ",
+                                                                      ProteinSequence[start(EdgesOfTheDeletionsInProtein)],
+                                                                      "|",
+                                                                      Deletions.Sequences,
+                                                                      "|",
+                                                                      ProteinSequence[end(EdgesOfTheDeletionsInProtein)],
+                                                                      "->",
+                                                                      ProteinSequence[start(EdgesOfTheDeletionsInProtein)], ProteinSequence[end(EdgesOfTheDeletionsInProtein)],
+                                                                      "\">", ProteinSequence[start(EdgesOfTheDeletionsInProtein)],
+                                                                      sep="")
+          ProteinSequence[end(EdgesOfTheDeletionsInProtein)]<-paste(ProteinSequence[end(EdgesOfTheDeletionsInProtein)],
+                                                                    "</mark>",
+                                                                    sep="")
+          #shift(EdgesOfTheDeletionsInProtein,1)
+          Deletions.GR<-GRanges(seqnames=as.vector(x["Name"]),
+                                ranges = EdgesOfTheDeletionsInProtein)
+          MrnaOnly.Informations[as.vector(x["Name"]),"Deletion"]<<-TRUE
+          DeletionsInPeptides.GR<-GenomicRanges::intersect(SpectralGRanges,
+                                                           Deletions.GR)
+          if(length(DeletionsInPeptides.GR)>0 &
+             sum(width(DeletionsInPeptides.GR)==2)>=1
+             ){
+            MrnaOnly.Informations[as.vector(x["Name"]),"Deletion_In_Peptide"]<<-TRUE
+          }
+          Subject<-Subject[-which(Query=="-")]
+          Query<-Query[-which(Query=="-")]
+        }
+        
+        #
+        #
+        
+        Insertions<-which(Subject=="-")+as.numeric(as.vector(x["QueryStart"]))-1
+        if(length(Insertions)>0){
+          Insertions.IR<-reduce(IRanges(Insertions,
+                                        Insertions))
+          ProteinSequence[start(Insertions.IR)]<-paste("<mark style=\"background-color:yellow;padding:0;border-width:0\" title=\"Insertion\">",
+                                                       ProteinSequence[start(Insertions.IR)],
+                                                       sep="")
+          ProteinSequence[end(Insertions.IR)]<-paste(ProteinSequence[end(Insertions.IR)],
+                                                     "</mark>",sep="")
+          Subject[which(Subject=="-")]<-Query[which(Subject=="-")]
+          Insertions.GR<-GRanges(seqnames=as.vector(x["Name"]),
+                                ranges = ranges(Insertions.IR))
+          MrnaOnly.Informations[as.vector(x["Name"]),"Insertion"]<<-TRUE
+          InsertionInPeptides.GR<-GenomicRanges::intersect(SpectralGRanges,Insertions.GR)
+          if(length(InsertionInPeptides.GR)>0){
+            MrnaOnly.Informations[as.vector(x["Name"]),"Insertion_In_Peptide"]<<-TRUE
+          } 
+        } 
+        ProteinSequence[as.numeric(as.vector(x["QueryStart"]))]<-paste("<b title=\"",
+          as.vector(x["SubjectSeqId"]),
+          " From:",as.vector(x["SubjectStart"]),
+          " To:",as.vector(x["SubjectEnd"]),
+          " Of:",as.vector(x["SubjectLength"]),
+          " Mismatch:",as.vector(x["Mismatch"]),
+          " Gaps:",as.vector(x["Gaps"]),
+          "\">",ProteinSequence[as.numeric(as.vector(x["QueryStart"]))],
+          sep="")
+        ProteinSequence[as.numeric(as.vector(x["QueryEnd"]))]<-paste(ProteinSequence[as.numeric(as.vector(x["QueryEnd"]))],
+        "</b>",
+        sep="")
+        SubjectNoGap.Sequence<-paste(Subject,collapse="")
+      Diffs<-which(Query!=Subject)
+      if(length(Diffs)>0){
+        Diffs<-reduce(IRanges(Diffs,Diffs))
+        Mismatch.Sequences<-substring(SubjectNoGap.Sequence,first=start(Diffs),last=end(Diffs))
+        Diffs<-shift(Diffs,as.numeric(as.vector(x["QueryStart"]))-1)
+        ProteinSequence[start(Diffs)]<-paste("<u color=red title=\"", Mismatch.Sequences,"\">",ProteinSequence[start(Diffs)],sep="")
+        ProteinSequence[end(Diffs)]<-paste(ProteinSequence[end(Diffs)],"</u>",sep="")
+        Diffs.GR<-GRanges(seqnames=as.vector(x["Name"]),
+                                ranges = ranges(Diffs))
+          MrnaOnly.Informations[as.vector(x["Name"]),"SAAV"]<<-TRUE
+          DiffsInPeptides.GR<-GenomicRanges::intersect(SpectralGRanges,Diffs.GR)
+          if(length(DiffsInPeptides.GR)>0){
+            MrnaOnly.Informations[as.vector(x["Name"]),"SAAV_In_Peptide"]<<-TRUE
+          }
+        }
+      }else{
+        MrnaOnly.Informations[as.vector(x["Name"]),"Not_In_Blast"]<<-TRUE
+      }
+      
+      
+      
+      
+      Blocks<-seq(10,length(ProteinSequence),10)
+      if(length(ProteinSequence)>60){
+        NewLines<-seq(60,length(ProteinSequence),60)
+        Blocks<-Blocks[!Blocks %in% NewLines]
+        ProteinSequence[NewLines]<-paste(ProteinSequence[NewLines],"</br>",sep="")
+      }
+      ProteinSequence[Blocks]<-paste(ProteinSequence[Blocks],"&nbsp;",sep="")
+      ProteinSequence[1]<-paste("<div style=\"font-family:courier\">",
+        ProteinSequence[1],
+        sep="")
+      ProteinSequence[length(ProteinSequence)]<-paste(ProteinSequence[length(ProteinSequence)],
+        "</div>",
+        sep="")
+      ProteinSequence<-paste(ProteinSequence,collapse="")
+      return(ProteinSequence)
+    },
+    Pep.GR
+  )
+  MrnaOnly$Start.position<-gsub("/",
+    " ",
+    MrnaOnly$Start.position)
+  MrnaOnly$End.position<-gsub("/",
+    " ",
+    MrnaOnly$End.position)
+  MrnaOnly$PEP<-gsub("/",
+    " ",
+    MrnaOnly$PEP)
+  MrnaOnly$Proteins<-gsub("/",
+    " ",
+    MrnaOnly$Proteins)
+  MrnaOnly$Sequence<-gsub("/",
+    " ",
+    MrnaOnly$Sequence)
+  
+  
+  MrnaOnly$Protein<-NULL
+  #MrnaOnly$Name<-gsub(","," ",MrnaOnly$Name)
+  #MrnaOnly$Name<-gsub("=",":",MrnaOnly$Name)  
+  MrnaOnly<-MrnaOnly[order(MrnaOnly$N_Peptides,
+    decreasing=TRUE),]
+  MrnaOnly[,c("QueryLength",
+              "QueryStart",
+              "QueryEnd",
+              "QuerySequence",
+              "SubjectSeqId",
+              "SubjectStart",
+              "SubjectEnd",
+              "SubjectLength",
+              "SubjectSequence",
+              "Length",
+              "Mismatch",
+              "Gaps",
+              "Evalue",
+              "BitScore")]<-NULL
+  MrnaOnly$PEPTIDES<-apply(MrnaOnly[,
+                                    c("Start.position",
+                                      "End.position",
+                                      "PEP",
+                                      "Proteins",
+                                      "Sequence")],
+                           1,
+                           function(x){
+                             Starts<-strsplit(x=x["Start.position"],
+                                              split=" ")
+                             End<-strsplit(x=x["End.position"],
+                                           split=" ")
+                             PEP<-strsplit(x=x["PEP"],
+                                           split=" ")
+                             Proteins<-strsplit(x=x["Proteins"],
+                                           split=" ")
+                             Sequences<-strsplit(x=x["Sequence"],
+                                           split=" ")
+                             Proteins<-lapply(Proteins,
+                                              function(y){
+                                                y<-gsub(";",
+                                                     " ",
+                                                     y)
+                                                y<-gsub(",[^ ]*",
+                                                     "",
+                                                     y)
+                                              y<-gsub("sp\\||tr\\|",
+                                                     "",
+                                                     y)
+                                                
+                                                y<-gsub("\\|[^ ]*",
+                                                     "",
+                                                     y)
+                                                return(y)
+                                              }
+                             )
+                             TABLE<-data.frame(Start=Starts,
+                                               End=End,
+                                               Pep=PEP,
+                                               Proteins=Proteins,
+                                               Sequence=Sequences)
+                             colnames(TABLE)<-c("Start",
+                                                "End",
+                                                "PEP",
+                                                "Proteins",
+                                                "Sequences")
+                             TABLE<-TABLE[
+                               order(
+                                 as.numeric(
+                                   as.vector(
+                                   TABLE$Start
+                                   )
+                                   )
+                                 ),]
+                             scroll_box(
+                               kable_styling(
+                                 kable(TABLE)
+                               ),
+                               fixed_thead = T,
+                               height = "150px"
+                             )
+                           })
+  MrnaOnly$MatchProtein<-lapply(
+    MrnaOnly[,
+             "Proteins"],
+    function(y){
+      y<-gsub(";",
+              " ",
+              y)
+      y<-gsub(",[^ ]*",
+              "",
+              y)
+      y<-gsub("sp\\||tr\\|",
+              "",
+              y)
+      
+      y<-gsub("\\|[^ ]*",
+              "",
+              y)
+      y<-unique(unlist(strsplit(y," ")))
+      y<-paste(y,collapse = " ")
+      return(y)
+    }
+  )
+  MrnaOnly$N_MatchProtein<-lapply(
+    MrnaOnly[,
+             "Proteins"],
+    function(y){
+      y<-gsub(";",
+              " ",
+              y)
+      y<-gsub(",[^ ]*",
+              "",
+              y)
+      y<-gsub("sp\\||tr\\|",
+              "",
+              y)
+      
+      y<-gsub("\\|[^ ]*",
+              "",
+              y)
+      y<-unique(unlist(strsplit(y," ")))
+      return(length(y))
+    }
+  )
+  MrnaOnly[,c("Start.position",
+                                      "End.position",
+                                      "PEP",
+                                      "Proteins")]<-NULL
+  MrnaOnly<-MrnaOnly[,c("Name",
+                        "N_Peptides",
+                        "N_MatchProtein",
+                        "MatchProtein",
+                        "PEPTIDES",
+                        "SequenceInHTML")]
+  datatable(MrnaOnly,
+    escape=FALSE,
+    rownames=FALSE,
+    extensions = 'Responsive',
+    options=list(columnDefs=list(list(className="none",targets=5))))
+  MrnaOnly.Informations<-data.frame(MrnaOnly.Informations)
+```
+
+
+
+
+
+
+## SAAV
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$SAAV],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## SAAV in peptides
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$SAAV_In_Peptide],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## Insertion
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Insertion],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## Insertion in peptides
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Insertion_In_Peptide],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## Deletion
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Deletion],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## Deletion in peptides
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Deletion_In_Peptide],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## Peptide not in BLAST
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Peptide_Not_In_Blast],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+## mRNA Not in BLAST
+```{r eval=params$PEPTIDES_PART}
+datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Not_In_Blast],],
+          escape=FALSE,
+          rownames=FALSE,
+          extensions = 'Responsive',
+          options=list(columnDefs=list(list(className="none",targets=5))))
+```
+
+
+
+```{r eval=params$VERBOSE,results="asis",echo=FALSE}
+cat("# Infos {.tabset}
+
+## Parameters
+")
+```
+
+
+```{r eval=params$VERBOSE}
+PARAMETERS<-unlist(params)
+PARAMETERS.DF<-data.frame(PARAMETER=names(PARAMETERS),VALUE=PARAMETERS)
+datatable(PARAMETERS.DF,rownames = FALSE)
+```
+
+```{r eval=params$VERBOSE,results="asis",echo=FALSE}
+cat("## Session
+")
+```
+
+```{r eval=params$VERBOSE,echo=FALSE}
+sessionInfo()
+```
+
+
+```{r}
+ProteinBank.Names<-names(ProteinBank)
+SP_Canonical<-ProteinBank.Names[
+  intersect(
+    grep("^sp",ProteinBank.Names),
+    grep("-[0-9]*\\|",ProteinBank.Names,invert=TRUE))]
+SP_Canonical.Short<-gsub(" .*","",SP_Canonical)
+BlastNames<-ProteinBank.Names[
+  grep("Blast=",ProteinBank.Names)]
+BlastHitNames<-gsub(".*Blast=","",BlastNames)
+SP_Canonical.NoMrna.Short<-SP_Canonical.Short[!SP_Canonical.Short %in% BlastHitNames]
+SP_Canonical.NoMrna.InMS.Short<-SP_Canonical.NoMrna.Short[SP_Canonical.NoMrna.Short %in% ProteinsInMS.NoContam]
+SP_Canonical.NoMrna.InMS.Short<-gsub(
+  "\\|.*",
+  "",
+  gsub(
+    "sp\\|",
+    "",
+    SP_Canonical.NoMrna.InMS.Short
+  )
+)
+write.table(data.frame(UNIPROT_ID=SP_Canonical.NoMrna.InMS.Short),
+            "PURE_CANONICAL.NomRNA.UNIPROT_ID.txt",
+            row.names = FALSE,
+            quote=FALSE,
+            sep="\t")
+```
+
+```{r}
+ProteinBank.Names<-names(ProteinBank)
+CommonUniprot<-ProteinBank.Names[grep("(UNIPROT|Blast)=",ProteinBank.Names)]
+CommonUniprot<-gsub("^[^\\|]*\\|",
+                    "",
+                    CommonUniprot)
+CommonUniprot<-gsub("\\|.*",
+                    "",
+                    CommonUniprot)
+
+write.table(data.frame(UNIPROT_ID=CommonUniprot),
+            "PRESENT_SPECTRO_RNASEQ.UNIPROT_ID.txt",
+            row.names = FALSE,
+            quote=FALSE,
+            sep="\t")
+```
+
+
+    
+<!--To be remove after presentation-->
+
+# What to do next ?
+
+* MSGF+ more cluster friendly
+
+* Compare with whole UNIPROT
+
+* Compare with SWISSPROT Canonical Only
+
+* UNIPROT but no mRNA ?
+
+* UNIPROT and mRNA ?
+
+<!--/To be remove after presentation-->

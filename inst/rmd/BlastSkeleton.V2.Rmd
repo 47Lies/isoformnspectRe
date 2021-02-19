@@ -1,0 +1,378 @@
+---
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    css: IsoAndSpe.css
+    logo: "IsoAndSpe.png"
+params:
+    LocalTitle: "Chtullhu"
+    ProteinBankFasta: !r system.file("extdata", "protein_bank.example.fasta",package = "isoformnspectRe")
+    PeptideResults: !r system.file("extdata", "peptides.example.txt",package = "isoformnspectRe")
+    SampleDescription:  !r system.file("extdata", "SampleDescription.txt",package = "isoformnspectRe")
+    Blast: !r system.file("extdata", "blast_rescue.example.txt",package = "isoformnspectRe")
+    IntensityPrefix: "Intensity "
+    SampleGroupName: "LooseSampleGroup"
+    SampleName: "SampleName"
+    ProteinOfInterest: "strngt.16858.3,start=259,stop=4446,frame=1,flag=LonguestORF,Origin=3',Blast=sp|Q15596|NCOA2_HUMAN"
+title: "`r params$ProteinOfInterest`"
+---
+
+
+```{r ressources, include=FALSE}
+CurrentSession<-sessioninfo::package_info()
+if(!"flexdashboard" %in% CurrentSession$package) library("flexdashboard", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"Biostrings" %in% CurrentSession$package) library("Biostrings", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"DT" %in% CurrentSession$package) library("DT", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"data.table" %in% CurrentSession$package) library("data.table", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"GenomicFeatures" %in% CurrentSession$package) library("GenomicFeatures", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"ggplot2" %in% CurrentSession$package) library("ggplot2", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"plotly" %in% CurrentSession$package) library("plotly", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"rtracklayer" %in% CurrentSession$package) library("rtracklayer", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"httr" %in% CurrentSession$package) library("httr", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"xml2" %in% CurrentSession$package) library("xml2", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+if(!"viridisLite" %in% CurrentSession$package) library("viridisLite", character.only = TRUE, quietly = TRUE, verbose = FALSE)
+
+CurrentList<-ls()
+if(!"BANK" %in% CurrentList) BANK<-Biostrings::readAAStringSet(params$ProteinBankFasta)
+if(!"PEPTIDES" %in% CurrentList){ PEPTIDES<-data.table::fread(params$PeptideResults,integer64 = "numeric")
+if("UpdateProteins" %in% colnames(PEPTIDES)){
+  PEPTIDES$Proteins<-PEPTIDES$UpdateProteins
+}
+if("UpdatedSequence" %in% colnames(PEPTIDES)){
+  PEPTIDES$Sequence<-PEPTIDES$UpdatedSequence
+}}
+if(!"BLAST" %in% CurrentList) BLAST<-read.table(
+  params$Blast,
+  header = TRUE,
+  sep = "\t",
+  quote = "\"",
+  stringsAsFactors = TRUE)
+if(!"SampleDescription" %in% CurrentList) SampleDescription <- read.table(params$SampleDescription, header = TRUE)
+ 
+BlastPalette<-viridis(3)
+#source(params$Utils)
+
+#source("./SharedFunctionAcrossRmd.R")
+```
+
+```{r DatatableProcess, include=FALSE}
+
+names(BANK) <- gsub(" .*", "", names(BANK))
+
+#Debug purpose
+#PeptideOfInterest<-"RYQDTPGVEHIPVVQIDLSVPLK"
+LocalProt<-BANK[params$ProteinOfInterest]
+if("SplitedUpdateProteins" %in% colnames(PEPTIDES)) {
+  LocalPeptides <-
+    PEPTIDES[`SplitedUpdateProteins` == params$ProteinOfInterest]
+} else{
+  LocalPeptides <-
+    PEPTIDES[`Leading razor protein` == params$ProteinOfInterest]
+}
+LightIntensitiesName <- colnames(LocalPeptides)[
+  grep(params$IntensityPrefix,
+       colnames(LocalPeptides))]
+MaxIntensities<-apply(
+  LocalPeptides[,..LightIntensitiesName],
+  1,max)
+
+LocalPeptides[, (LightIntensitiesName) := lapply(.SD, function(x) x/MaxIntensities), .SDcols = LightIntensitiesName]
+
+
+#SampleDescription <- read.table(params$SampleDescription, header = TRUE)
+Groups <- as.vector(SampleDescription[,params$SampleGroupName])
+Groups <- Groups[!duplicated(Groups)]
+SampleDescription[,params$SampleGroupName] <-
+  factor(as.vector(SampleDescription[,params$SampleGroupName]),
+         levels = c(Groups))
+if(length(grep(" $",params$IntensityPrefix))>0){
+  UsablePrefix<-params$IntensityPrefix
+}else{
+  UsablePrefix<-paste(params$IntensityPrefix," ",sep="")
+}
+SamplesByGroup <- lapply(as.vector(Groups),
+                         function(x, SampleDescription) {
+                           paste(UsablePrefix, as.vector(SampleDescription[SampleDescription[,params$SampleGroupName] == x, params$SampleName]),sep="")
+                         }, SampleDescription = SampleDescription)
+names(SamplesByGroup) <- Groups
+for(LocalGroup in Groups) {
+  LocalPeptides[, paste(LocalGroup, "Infos") := paste(.SD, collapse = ","), .SDcols =
+                  SamplesByGroup[[LocalGroup]], by = Sequence]
+}
+
+PeptideColumnOfInterest<-c("Proteins",
+                           "Sequence",
+                           paste(Groups,"Infos"),
+                           "Start position",
+                           "End position",
+                           #"Score",
+                           "PEP"
+                           )
+#Discard the peptides that came from nowhere 
+#Most likely found only on Heavy intensities
+#Silac's Burden
+LocalPeptides<-LocalPeptides[MaxIntensities>0,]
+LocalPeptides<-LocalPeptides[,PEP:=formatC(PEP,
+                                          format = "e",
+                                          digits = 2)]
+
+```
+
+```{r functions, include=FALSE}
+LocalQuery<-gsub(",Blast=.*",
+                 "",
+                 params$ProteinOfInterest)
+LocalSubject<-gsub(".*,Blast=",
+                 "",
+                 params$ProteinOfInterest)
+Infos<-BLAST[BLAST$QuerySeqId==LocalQuery & BLAST$SubjectSeqId==LocalSubject,][1,]
+PeptidesCols<-c("Start position","End position","PEP","Proteins","Sequence")
+LocalPep<-data.frame(LocalPeptides[,..PeptidesCols])
+colnames(LocalPep)<-c("Start","End","Pep","Proteins","Sequence")
+LocalPep$Proteins <-
+  unlist(lapply(LocalPep$Proteins, function(x) {
+    paste(unlist(lapply(
+      unlist(strsplit(split = ';', x)), STRING_ProteinShortName
+    )), collapse = " ")
+  }))
+
+       
+LocalProteinSequence<-HTML_PrettyBlastSequence(
+  Sequence=as.vector(LocalProt),
+  Peptides=LocalPep,
+  Rescue=Infos[,c("QueryStart","QueryEnd","QuerySequence","SubjectSequence",
+                 "SubjectSeqId","SubjectStart","SubjectEnd","SubjectLength")],
+  LineWidth=60)
+```
+
+```{r GGplotProcess, include=FALSE}
+
+TranscriptId <- gsub(",.*$",
+                     "",
+                     params$ProteinOfInterest)
+
+GeneId <- gsub(".[^.]*$",
+               "",
+               TranscriptId)
+```
+
+Column {data-width=600}
+-----------------------------------------------------------------------
+
+
+
+
+
+### Peptides
+
+<details>
+
+<summary>Table description</summary>
+<p>
+
+All the peptides that match this protein, each line is a peptide.
+
+ * Proteins: Number of proteins that match this peptide. You can hover over the number to have more informations on the different proteins matched by this peptide.
+ 
+ * Sequence: Peptide sequence. If the peptide sequence is too long, you can hover over it to see the whole sequence in a popup. 
+ 
+ * Infos: Normalized intensities of the peptides across all the sample of a group. Group are defined by values presents in the sample sheet file. You can hover over the bars to see the sample name.
+ 
+ * Start position: matching start position of the peptide in the protein sequence
+ 
+ * End position: matching end position of the peptide in the protein sequence
+ 
+ * PEP: FDR of the peptide identification
+ 
+</p>
+</details>
+
+
+```{r}
+
+
+LocalPeptides <- LocalPeptides[,
+                               Sequence := HTML_VECTOR_Peptide2Popover(Sequence, 15)]
+LocalDatatable <- DT::datatable(
+  LocalPeptides[,..PeptideColumnOfInterest],
+  width = "100%",
+  #extension =c("Responsive"),
+  options = LIST_ComputeDatatableOptions(LIST_SampleNames=SamplesByGroup),
+  rownames = FALSE,
+  escape = FALSE
+)
+#LocalDatatable<-formatSignif(LocalDatatable,"PEP",digits=3)
+LocalDatatable$dependencies <-
+  append(LocalDatatable$dependencies,
+         htmlwidgets:::getDependency("sparkline"))
+LocalDatatable
+
+```
+
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+
+
+
+### Protein
+
+<details>
+
+<summary>Protein legend</summary>
+<p>
+
+Protein sequence as provided in the protein bank. Since it is a BLAST hit, it means that the protein sequence from the mRNA (query) shared a common part with the reference sequence from UNIPROT (subject). The protein sequence migh also have a specific part.
+
+* Matching peptide is displayed with this <span class='Peptide'>FORMALISM</span>
+
+* Matching proteotypic peptide is displayed with this <span class='Proteotypic'>FORMALISM</span>
+
+* Matching part between the protein obtained from the mRNA and the one present in UNIPROT is displayed with this <span class='Blast'>FORMALISM</span>
+
+On the matching part we may encounter differences between the two sequences:
+
+* Single amino acid variation between the two sequences are displaeyd with this <span class='SAAV'>FORMALISM</span>
+
+* Insertions of amino acid in the mRNA obtained protein compared to the UNIPROT match are displayed with this <span class='Insertion'>FORMALISM</span>
+
+* Deletions of amino acid in the mRNA obtained protein  compared to the UNIPROT match are displayed with this <span class='Deletion'>FORMALISM</span>
+
+You can hover over each formalism to have more informations. A specific positon on the protein sequence can have several features of interest such as overlapping peptide due to misscleavage or a peptide overlaping a aplicing variant, each of these features will be diplayed in the informations.
+
+</p>
+</details>
+
+```{r, results='asis'}
+cat(LocalProteinSequence$SequenceInHTML)
+```
+
+
+
+### Blast schema
+
+<details>
+
+<summary>Blast schema</summary>
+<p>
+The blast schema correspond to a quick view of the mapping between the two sequences.
+
+The purple part, in the upper row correspond to the part that are specific to the mRNA obtained protein.
+
+The yellow part, in the lower row correspond to the part that are specific to the UNIPROT match.
+
+The turquoise part, in the middle row correspond to the part that are shared between the mRNA obtained protein and the UNIPROT match.
+
+The N-ter is on the left side of the schema, the C-Ter is on the right side.
+
+</p>
+</details>
+
+```{r}
+DFs <- BlastCoordPlotly(
+  Infos$QuerySeqId,
+  Infos$QueryLength,
+  Infos$QueryStart,
+  Infos$QueryEnd,
+  Infos$SubjectSeqId,
+  Infos$SubjectStart,
+  Infos$SubjectEnd,
+  Infos$SubjectLength,
+  Infos$Length
+)
+
+
+names(BlastPalette) <- c(
+  as.vector(Infos$QuerySeqId) ,
+  paste(
+    as.vector(Infos$QuerySeqId),
+    "<br>",
+    as.vector(Infos$SubjectSeqId),
+    sep = ""
+  ),
+  as.vector(Infos$SubjectSeqId)
+)
+
+P<-plotly::plot_ly()
+P <- plotly::add_trace(P,
+  x = DFs$MatchBlock$x,
+  y = DFs$MatchBlock$y,
+  color = I(as.vector(BlastPalette[2])),
+  type = "scatter",
+  mode = "lines",
+  fill = "toself",
+  name = paste(
+    as.vector(Infos$QuerySeqId),
+    "<br>",
+    as.vector(Infos$SubjectSeqId),
+    sep = ""
+  ),
+  hoverinfo="name",
+  hoverlabel=list(namelength=-1)
+  )
+P <- plotly::add_trace(P,
+  x = DFs$SubjectBlock$x,
+  y = DFs$SubjectBlock$y,
+  color = I(as.vector(BlastPalette[3])),
+  type = "scatter",
+  mode = "lines",
+  fill = "toself",
+  name = Infos$SubjectSeqId,
+  hoverinfo="name",
+  hoverlabel=list(namelength=-1)
+)
+P <- plotly::add_trace(P,
+  x = DFs$QueryBlock$x,
+  y = DFs$QueryBlock$y,
+  color = I(as.vector(BlastPalette[1])),
+  type = "scatter",
+  mode = "lines",
+  fill = "toself",
+  name = Infos$SubjectSeqId,
+  hoverinfo="name",
+  hoverlabel=list(namelength=-1)
+)
+P<-plotly::add_segments(P,
+                 x=~x,
+                 y=~y,
+                 xend=~xend,
+                 yend=~yend,
+                 hoverinfo="text",
+                 color=I(BlastPalette[3]),
+                 text=~text,
+                 data=DFs$SubjectConnectors)
+P<-plotly::add_segments(P,
+                 x=~x,
+                 y=~y,
+                 xend=~xend,
+                 yend=~yend,
+                 hoverinfo="text",
+                 color=I(BlastPalette[1]),
+                 text=~text,
+                 data=DFs$QueryConnectors)
+
+P<-plotly::hide_legend(P)
+
+#Hide axis grid
+#https://plotly.com/r/axes/
+NoDecorations <- list(
+  title = "",
+  zeroline = FALSE,
+  showline = FALSE,
+  showticklabels = FALSE,
+  showgrid = FALSE,
+  ticks=""
+)
+P <- plotly::layout(P,
+             xaxis = NoDecorations,
+             yaxis = NoDecorations)
+P
+```
+
+<!-- Redundant code since it is already present in the drawcallback of the peptide datatable but in case one day I decide to get rid of the data table, this will be necessary -->
+```{js, echo=FALSE}
+$('[data-toggle="popover"]').popover({container: 'body'});
+```
+

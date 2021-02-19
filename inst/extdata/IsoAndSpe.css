@@ -1,0 +1,88 @@
+.navbar-inverse {
+    background-color: #FFCA05;
+    border-color: #FFCA05;
+}
+
+a {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+  display: block;
+}
+
+
+
+a:link {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:active {
+  color: black;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+div:hoover{
+  display: block;
+  position: absolute;
+}
+
+.Peptide{
+  color:red;
+}
+
+.Proteotypic{
+  color:blue;
+}
+
+
+.VariantSplicing{
+  text-decoration: underline;
+}
+
+.position{
+  background-color: transparent;
+  text-decoration: none;
+  color:black;
+}
+
+.Deletion{
+  background-color:#6B8E23;
+  padding:0;
+  border-width:0;
+}
+
+.Insertion{
+  background-color:#DAA520;
+  padding:0;
+  border-width:0;
+}
+
+.SAAV{
+  background-color:#87CEEB;
+  padding:0;
+  border-width:0;
+}
+
+.Blast{
+  font-weight:bold;
+  padding:0;
+  border-width:0;
+}
+.popover{
+    max-width: 100%; /* Max Width of the popover (depending on the container!) */
+}
