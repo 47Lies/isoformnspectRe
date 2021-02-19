@@ -8,6 +8,6 @@ Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
 License: GPL-2
 Encoding: UTF-8
-Imports:  httr, htmlwidgets,viridisLite, GenomicFeatures, sessioninfo, sparklines, knitr, kableExtra, furrr, rmarkdown, flexdashboard, future, IRanges, stringr, Biostrings, GenomicRanges, xml2,  data.table, DT, plotly
+Imports:  httr, htmlwidgets,viridisLite, GenomicFeatures, sessioninfo, knitr, kableExtra, furrr, rmarkdown, flexdashboard, future, IRanges, stringr, Biostrings, GenomicRanges, xml2,  data.table, DT, plotly
 LazyData: true
 RoxygenNote: 7.1.0
