@@ -14,7 +14,6 @@
 #' @import flexdashboard
 #' @import GenomicFeatures
 #' @import sessioninfo
-#' @import sparklines
 #' @import viridisLite
 #'
 #' @examples
@@ -109,7 +108,6 @@ RenderARegular<-function(RegularProt,
 #' @import flexdashboard
 #' @import GenomicFeatures
 #' @import sessioninfo
-#' @import sparklines
 #' @import viridisLite
 #'
 #' @examples
@@ -207,7 +205,6 @@ RenderAnIsoform<-function(IsoformProt,
 #' @import flexdashboard
 #' @import GenomicFeatures
 #' @import sessioninfo
-#' @import sparklines
 #' @import viridisLite
 #'
 #' @examples
