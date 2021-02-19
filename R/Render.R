@@ -20,6 +20,7 @@
 #' library(rmarkdown)
 #' library("flexdashboard")
 #' library("sessioninfo")
+#' library("sparklines")
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #'  "protein_bank.example.fasta",
 #'   package = "isoformnspectRe")
@@ -114,6 +115,7 @@ RenderARegular<-function(RegularProt,
 #' library(rmarkdown)
 #' library("flexdashboard")
 #' library("sessioninfo")
+#' library("sparklines")
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #'  "protein_bank.example.fasta",
 #'   package = "isoformnspectRe")
@@ -211,6 +213,7 @@ RenderAnIsoform<-function(IsoformProt,
 #' library(rmarkdown)
 #' library("flexdashboard")
 #' library("sessioninfo")
+#' library("sparklines")
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #'  "protein_bank.example.fasta",
 #'   package = "isoformnspectRe")
