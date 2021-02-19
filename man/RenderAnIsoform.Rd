@@ -39,7 +39,7 @@ Title
 library(rmarkdown)
 library("flexdashboard")
 library("sessioninfo")
-library("sparklines")
+library("sparkline")
 ProteinBankFastaFilePath <- system.file("extdata",
  "protein_bank.example.fasta",
   package = "isoformnspectRe")

@@ -15,12 +15,13 @@
 #' @import GenomicFeatures
 #' @import sessioninfo
 #' @import viridisLite
+#' @import sparkline
 #'
 #' @examples
 #' library(rmarkdown)
 #' library("flexdashboard")
 #' library("sessioninfo")
-#' library("sparklines")
+#' library("sparkline")
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #'  "protein_bank.example.fasta",
 #'   package = "isoformnspectRe")
@@ -110,12 +111,13 @@ RenderARegular<-function(RegularProt,
 #' @import GenomicFeatures
 #' @import sessioninfo
 #' @import viridisLite
+#' @import sparkline
 #'
 #' @examples
 #' library(rmarkdown)
 #' library("flexdashboard")
 #' library("sessioninfo")
-#' library("sparklines")
+#' library("sparkline")
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #'  "protein_bank.example.fasta",
 #'   package = "isoformnspectRe")
@@ -208,12 +210,13 @@ RenderAnIsoform<-function(IsoformProt,
 #' @import GenomicFeatures
 #' @import sessioninfo
 #' @import viridisLite
+#' @import sparkline
 #'
 #' @examples
 #' library(rmarkdown)
 #' library("flexdashboard")
 #' library("sessioninfo")
-#' library("sparklines")
+#' library("sparkline")
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #'  "protein_bank.example.fasta",
 #'   package = "isoformnspectRe")

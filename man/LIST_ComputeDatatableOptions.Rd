@@ -30,7 +30,7 @@ automatic inclusion of sparkline javascript code. Need some very secific DATA
 \examples{
 library(data.table)
 library(DT)
-library(sparklines)
+library(sparkline)
 library(htmlwidgets)
 P_FilePath <- system.file("extdata",
  "peptides.example.txt",

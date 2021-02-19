@@ -10,12 +10,13 @@
 #' @export
 #' @importFrom htmlwidgets getDependency
 #' @importFrom htmlwidgets JS
+#' @import sparkline
 #'
 #'
 #' @examples
 #' library(data.table)
 #' library(DT)
-#' library(sparklines)
+#' library(sparkline)
 #' library(htmlwidgets)
 #' P_FilePath <- system.file("extdata",
 #'  "peptides.example.txt",
