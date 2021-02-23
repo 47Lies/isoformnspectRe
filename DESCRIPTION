@@ -1,7 +1,7 @@
 Package: isoformnspectRe
 Type: Package
 Title: Companion package of a nextflow pipeline
-Version: 0.1.1
+Version: 0.1.2
 Author: 47Lies
 Maintainer: 47Lies <lieng.taing@gmail.com>
 Description: More about what it does (maybe more than one line)
