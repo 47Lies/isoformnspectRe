@@ -29,7 +29,7 @@
 #'  "peptides.example.txt",
 #'   package = "isoformnspectRe")
 #' IntensityPrefix <- "Intensity "
-#' Pep<-read.table(PepFilePath, header=TRUE,sep=",",quote="\"")
+#' Pep<-read.table(PepFilePath, header=TRUE,sep="\t",quote="\"")
 #' ProteinOfInterest <- unique(Pep$Leading.razor.protein)
 #' ProteinOfInterest <- ProteinOfInterest[grep("UNIPROT=",ProteinOfInterest)]
 #' ProteinOfInterest <- ProteinOfInterest[grep("-",ProteinOfInterest,invert=TRUE)][1]
@@ -125,7 +125,7 @@ RenderARegular<-function(RegularProt,
 #'  "peptides.example.txt",
 #'   package = "isoformnspectRe")
 #' IntensityPrefix <- "Intensity "
-#' Pep<-read.table(PepFilePath, header=TRUE,sep=",",quote="\"")
+#' Pep<-read.table(PepFilePath, header=TRUE,sep="\t",quote="\"")
 #' ProteinOfInterest <- unique(Pep$Leading.razor.protein)
 #' ProteinOfInterest <- ProteinOfInterest[grep("UNIPROT=",ProteinOfInterest)]
 #' ProteinOfInterest <- ProteinOfInterest[grep("-",ProteinOfInterest)][1]
@@ -227,7 +227,7 @@ RenderAnIsoform<-function(IsoformProt,
 #'  "blast_rescue.example.txt",
 #'   package = "isoformnspectRe")
 #' IntensityPrefix <- "Intensity "
-#' Pep<-read.table(PepFilePath, header=TRUE,sep=",",quote="\"")
+#' Pep<-read.table(PepFilePath, header=TRUE,sep="\t",quote="\"")
 #' ProteinOfInterest <- unique(Pep$Leading.razor.protein)
 #' ProteinOfInterest <- ProteinOfInterest[grep("Blast=",ProteinOfInterest)][1]
 #'

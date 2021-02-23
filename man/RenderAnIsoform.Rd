@@ -47,7 +47,7 @@ PepFilePath <- system.file("extdata",
  "peptides.example.txt",
   package = "isoformnspectRe")
 IntensityPrefix <- "Intensity "
-Pep<-read.table(PepFilePath, header=TRUE,sep=",",quote="\"")
+Pep<-read.table(PepFilePath, header=TRUE,sep="\t",quote="\"")
 ProteinOfInterest <- unique(Pep$Leading.razor.protein)
 ProteinOfInterest <- ProteinOfInterest[grep("UNIPROT=",ProteinOfInterest)]
 ProteinOfInterest <- ProteinOfInterest[grep("-",ProteinOfInterest)][1]

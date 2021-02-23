@@ -5,12 +5,14 @@
 \title{LIST_INDEX_VECTOR_GetMatchs
 get the matchings index un the protein bank}
 \usage{
-LIST_INDEX_VECTOR_GetMatchs(Peptides, ProteinBank)
+LIST_INDEX_VECTOR_GetMatchs(Peptides, ProteinBank, Threads = 1)
 }
 \arguments{
 \item{Peptides}{vector of peptides in amino acid code (capital letters)}
 
 \item{ProteinBank}{AAStringSet with their names}
+
+\item{Threads}{Number of parallel sessions (numeric)}
 }
 \value{
 LIST_INDEX_VECTOR_GetMatchs list of index vector each index of the list correspond to the index in the params Peptides vector. In each list element the vector correspond to the index of the protein that match this very particular pepetide.
@@ -34,5 +36,5 @@ c("pseudo prot A",
   "pseudo prot D")
 Proteins<-AAStringSet(Proteins)
 Peptides<-c("RRRR","MK","PQDGTSTLRENS")
-LIST_INDEX_VECTOR_GetMatchs(Peptides,Proteins)
+LIST_INDEX_VECTOR_GetMatchs(Peptides,Proteins,3)
 }

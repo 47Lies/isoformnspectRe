@@ -53,7 +53,7 @@ BlastFilePath <- system.file("extdata",
  "blast_rescue.example.txt",
   package = "isoformnspectRe")
 IntensityPrefix <- "Intensity "
-Pep<-read.table(PepFilePath, header=TRUE,sep=",",quote="\"")
+Pep<-read.table(PepFilePath, header=TRUE,sep="\t",quote="\"")
 ProteinOfInterest <- unique(Pep$Leading.razor.protein)
 ProteinOfInterest <- ProteinOfInterest[grep("Blast=",ProteinOfInterest)][1]
 

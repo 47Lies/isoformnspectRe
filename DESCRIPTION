@@ -1,13 +1,38 @@
 Package: isoformnspectRe
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Companion package of a nextflow pipeline
 Version: 0.1.1
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
+Author: 47Lies
+Maintainer: 47Lies <lieng.taing@gmail.com>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
 License: GPL-2
 Encoding: UTF-8
-Imports:  sparkline, httr, htmlwidgets,viridisLite, GenomicFeatures, sessioninfo, knitr, kableExtra, furrr, rmarkdown, flexdashboard, future, IRanges, stringr, Biostrings, GenomicRanges, xml2,  data.table, DT, plotly
+Imports: 
+    sparkline,
+    shinyjqui,
+    httr,
+    htmlwidgets,
+    viridisLite,
+    GenomicFeatures,
+    sessioninfo,
+    knitr,
+    kableExtra,
+    furrr,
+    rmarkdown,
+    flexdashboard,
+    future,
+    IRanges,
+    stringr,
+    Biostrings,
+    GenomicRanges,
+    xml2,
+    data.table,
+    DT,
+    plotly,
+    shinycssloaders,
+    shiny,
+    shinydashboard,
+    stats
 LazyData: true
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1

@@ -4,12 +4,14 @@
 \alias{DATAFRAME_AnnotateProteotypic}
 \title{DATAFRAME_AnnotateProteotypic Since we observe that some proteins are not present in the Proteins field, we decieded to}
 \usage{
-DATAFRAME_AnnotateProteotypic(PeptideDataFrame, ProteinBank)
+DATAFRAME_AnnotateProteotypic(PeptideDataFrame, ProteinBank, Threads = 1)
 }
 \arguments{
 \item{PeptideDataFrame}{MaxQuant peptide search as a data frame}
 
 \item{ProteinBank}{AAStringSet of the protein fasta file that was used for the mass spectrometry analysis}
+
+\item{Threads}{Number of parallel sessions (numeric)}
 }
 \value{
 PeptideDataFrame Updated data frame with informations
