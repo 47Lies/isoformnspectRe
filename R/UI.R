@@ -16,7 +16,7 @@ UI <- function() {
     skin = "yellow",
     shinydashboard::dashboardHeader(
       title = shiny::span(
-        shiny::img(
+        tags$img(
           src = system.file("extdata",
                             "IsoAndSpe.png",
                             package = "isoformnspectRe"),

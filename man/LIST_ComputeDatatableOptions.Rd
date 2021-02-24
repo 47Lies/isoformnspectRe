@@ -7,7 +7,7 @@ automatic inclusion of sparkline javascript code. Need some very secific DATA}
 \usage{
 LIST_ComputeDatatableOptions(
   LIST_SampleNames,
-  type = "Skeleton",
+  TYPE = "Skeleton",
   LIST_SparlinesOptions = list(type = "bar", height = 40, width = 60, highlightColor =
     "red", chartRangeMin = 0, chartRangeMax = 1, tooltipFormat =
     "{{offset:offset}} {{value.2}}")
@@ -16,7 +16,7 @@ LIST_ComputeDatatableOptions(
 \arguments{
 \item{LIST_SampleNames}{List of sample names that will be included for the sparkline}
 
-\item{type}{if it has to be included in a skeleton part or if it has to be included in the app}
+\item{TYPE}{if it has to be included in a skeleton part or if it has to be included in the app}
 
 \item{LIST_SparlinesOptions}{options to be included in the sparkline}
 }
@@ -38,18 +38,18 @@ P_FilePath <- system.file("extdata",
 Peptides<-fread(
  P_FilePath,
  integer64="double")
-SampleNames<-list("siNT"=c("siNT_48-1",
-"siNT_48-2",
-"siNT_48-3",
-"siNT_72-1",
-"siNT_72-2",
-"siNT_72-3"),
-"siSF3B1"=c("siSF3B1-1",
-"siSF3B1-2",
-"siSF3B1-3",
-"siSRSF1-1",
-"siSRSF1-2",
-"siSRSF1-3"))
+SampleNames<-list("siNT"=c("siNT_48.1",
+"siNT_48.2",
+"siNT_48.3",
+"siNT_72.1",
+"siNT_72.2",
+"siNT_72.3"),
+"siSF3B1"=c("siSF3B1.1",
+"siSF3B1.2",
+"siSF3B1.3",
+"siSRSF1.1",
+"siSRSF1.2",
+"siSRSF1.3"))
 Samples <- unlist(SampleNames)
 MaxIntensities <- apply(Peptides[,paste("Intensity",Samples),with=FALSE],1,max)
 Peptides[,

@@ -9,4 +9,4 @@ SampleDescriptionPath <- system.file("extdata",
                                      package = "isoformnspectRe")
 IntensityName <- "Intensity "
 SampleColumnName <- "SampleName"
-SampleGroupColumnName <- "SampleGroup"
+SampleGroupColumnName <- "LooseSampleGroup"

@@ -3,7 +3,7 @@
 #'
 #'
 #' @param LIST_SampleNames List of sample names that will be included for the sparkline
-#' @param type if it has to be included in a skeleton part or if it has to be included in the app
+#' @param TYPE if it has to be included in a skeleton part or if it has to be included in the app
 #' @param LIST_SparlinesOptions options to be included in the sparkline
 #'
 #' @return List of options that will be included in a DT::data.table
@@ -24,18 +24,18 @@
 #' Peptides<-fread(
 #'  P_FilePath,
 #'  integer64="double")
-#' SampleNames<-list("siNT"=c("siNT_48-1",
-#' "siNT_48-2",
-#' "siNT_48-3",
-#' "siNT_72-1",
-#' "siNT_72-2",
-#' "siNT_72-3"),
-#' "siSF3B1"=c("siSF3B1-1",
-#' "siSF3B1-2",
-#' "siSF3B1-3",
-#' "siSRSF1-1",
-#' "siSRSF1-2",
-#' "siSRSF1-3"))
+#' SampleNames<-list("siNT"=c("siNT_48.1",
+#' "siNT_48.2",
+#' "siNT_48.3",
+#' "siNT_72.1",
+#' "siNT_72.2",
+#' "siNT_72.3"),
+#' "siSF3B1"=c("siSF3B1.1",
+#' "siSF3B1.2",
+#' "siSF3B1.3",
+#' "siSRSF1.1",
+#' "siSRSF1.2",
+#' "siSRSF1.3"))
 #' Samples <- unlist(SampleNames)
 #' MaxIntensities <- apply(Peptides[,paste("Intensity",Samples),with=FALSE],1,max)
 #' Peptides[,
@@ -59,7 +59,7 @@
 #'
 LIST_ComputeDatatableOptions<-function(
   LIST_SampleNames,
-  type="Skeleton",
+  TYPE="Skeleton",
   LIST_SparlinesOptions=list(
     type="bar",
     height=40,
@@ -69,7 +69,7 @@ LIST_ComputeDatatableOptions<-function(
     chartRangeMax=1,
     tooltipFormat='{{offset:offset}} {{value.2}}')){
   N_Groups=length(LIST_SampleNames)
-  if(type=="Skeleton"){
+  if(TYPE=="Skeleton"){
     SCROLLY="750px"
     PAGING=FALSE
     ORDER=list(N_Groups+2,'asc')
@@ -79,7 +79,7 @@ LIST_ComputeDatatableOptions<-function(
       "function(data, type, row, meta) {",
       "return '<span  data-toggle=\"popover\" data-trigger=\"hover click\" data-placement=\"right\" data-html=\"true\" data-delay={show: 500, hide: 100} title=\"Proteins\" data-content=\"' + data.replace(/;/g,\"<br>\") + '\">' + data.split(';').length + '</span>'",
       "}")
-  }else{
+  }else if(TYPE=="app"){
     SCROLLY=NULL
     PAGING=TRUE
     PAGE_LENGTH = 5
@@ -134,17 +134,6 @@ LIST_ComputeDatatableOptions<-function(
     order = ORDER,
     dom=DOM,
     columnDefs=COLDEFS,
-    #columnDefs=list(list(targets=c(2,3,4,5),render=JS("function(data, type, full){return '<span class=spark>' + data + '</span>'}"))),
-    # #drawCallback=JS("function(){
-    #   $('.WNTspark:not(:has(canvas))').sparkline('html', {
-    #     type:'bar',
-    #     height:'40',
-    #     width:'60',
-    #     highlightColor:'red',
-    #     chartRangeMin:0,
-    #     chartRangeMax:1});
-    #   $('[data-toggle=\"popover\"]').popover({container: 'body'});}")
-    #columnDefs=COLDEFS,
     drawCallback=JS(DRAW_CALLBACK_TEXT)
   )
   return(OPTIONS)
