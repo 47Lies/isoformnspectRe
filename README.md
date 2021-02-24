@@ -1,4 +1,7 @@
 # isoformnspectRe
+
+[![R-CMD-check](https://github.com/47Lies/isoformnspectRe/actions/workflows/r.yml/badge.svg)](https://github.com/47Lies/isoformnspectRe/actions/workflows/r.yml)
+
 Companion package of the Iso-Spe pipeline
 
 The package aims to handle the R dependancies of the Iso-Spe pipeline. The Nextflow philosophy is to not have any absolute path in its script and we needed to have some Rmarkdown somewhere, the R package seems to be the best solution.
@@ -29,9 +32,11 @@ renv::install("47Lies/isoformnspectRe")
 
 ## Render rmarkdown
 
+
+
 ## ShinyApp
 
-The included shiny app aims to provide a navigation tool across the mass spec MaxQuant peptides.
+The included shiny app aims to provide a navigation tool across the mass spec MaxQuant peptides and have html link to each of the rmarkdown of the proteins.
 
 You will need to provide some informations before being able to launch it:
 
