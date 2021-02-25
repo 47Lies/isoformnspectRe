@@ -14,7 +14,8 @@
 #'   package = "isoformnspectRe")
 #' Rescue<-read.table(
 #'  R_FilePath,
-#'  header=TRUE)
+#'  header=TRUE,
+#'  stringsAsFactors = FALSE)
 #' CompareTwoSequences(
 #'  Rescue$QuerySequence[1],
 #'  Rescue$SubjectSequence[1],
