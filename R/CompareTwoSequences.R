@@ -17,9 +17,9 @@
 #'  header=TRUE,
 #'  stringsAsFactors = FALSE)
 #' CompareTwoSequences(
-#'  Rescue$QuerySequence[1],
-#'  Rescue$SubjectSequence[1],
-#'  Rescue$QueryStart[1])
+#'  as.vector(Rescue$QuerySequence[1]),
+#'  as.vector(Rescue$SubjectSequence[1]),
+#'  as.vector(Rescue$QueryStart[1]))
 CompareTwoSequences <- function(QuerySequence,
                                 SubjectSequence,
                                 QueryStart=12) {
