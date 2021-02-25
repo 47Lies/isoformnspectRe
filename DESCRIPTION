@@ -36,3 +36,5 @@ Imports:
     stats
 LazyData: true
 RoxygenNote: 7.1.1
+URL: https://github.com/47Lies/isoformnspectRe
+BugReports: https://github.com/47Lies/isoformnspectRe/issues

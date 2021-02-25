@@ -1,6 +1,9 @@
 # isoformnspectRe
+  <!-- badges: start -->
+  [![R-CMD-check](https://github.com/47Lies/isoformnspectRe/workflows/R-CMD-check/badge.svg)](https://github.com/47Lies/isoformnspectRe/actions)
+  [![R-CMD-check](https://github.com/47Lies/isoformnspectRe/actions/workflows/r.yml/badge.svg)](https://github.com/47Lies/isoformnspectRe/actions/workflows/r.yml)
+  <!-- badges: end -->
 
-[![R-CMD-check](https://github.com/47Lies/isoformnspectRe/actions/workflows/r.yml/badge.svg)](https://github.com/47Lies/isoformnspectRe/actions/workflows/r.yml)
 
 Companion package of the Iso-Spe pipeline
 
