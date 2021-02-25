@@ -24,11 +24,11 @@ CompareTwoSequences <- function(QuerySequence,
                                 QueryStart=12) {
   QuerySequenceVector <- unlist(
     strsplit(
-      split = "",
+      split  = NULL,
       x = QuerySequence))
   SubjectSequenceVector <- unlist(
     strsplit(
-      split = "",
+      split  = NULL,
       x = SubjectSequence))
   DeletionsInQuery <- which(QuerySequenceVector == "-")
   Differences <- GetEmptySpanRanges()
