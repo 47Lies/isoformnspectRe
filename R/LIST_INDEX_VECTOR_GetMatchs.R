@@ -65,8 +65,22 @@ LIST_INDEX_VECTOR_GetMatchs <-
 #' @param Threads Number of parallel sessions (numeric)
 #'
 #' @return PeptideDataFrame Updated data frame with informations
+#' @import tidyr
+#' @rawNamespace import(data.table,except=c(shift))
 #' @export
-DATAFRAME_AnnotateProteotypic <-
+#' @example 
+#' library(isoformnspectRe)
+#' ProteinBankFastaFilePath <- system.file("extdata",
+#' "protein_bank.example.fasta",
+#' package = "isoformnspectRe")
+#' ProteinBank <- readAAStringSet(ProteinBankFastaFilePath)
+#' PeptidePath <- system.file("extdata",
+#'                            "peptides.example.txt",
+#'                            package = "isoformnspectRe")
+#' options(datatable.integer64 = "numeric")
+#' Peptides <- data.table::fread(PeptidePath, sep = "\t")
+#' DATATABLE_AnnotateProteotypic(Peptides, ProteinBank, Threads = 1)
+DATATABLE_AnnotateProteotypic <-
   function(PeptideDataFrame, ProteinBank, Threads = 1) {
     Matchs <-
       LIST_INDEX_VECTOR_GetMatchs(PeptideDataFrame$Sequence, ProteinBank, Threads)
@@ -77,5 +91,28 @@ DATAFRAME_AnnotateProteotypic <-
     PeptideDataFrame$NProteins <- unlist(lapply(Matchs, length))
     PeptideDataFrame$Old_Proteins <- PeptideDataFrame$Proteins
     PeptideDataFrame$Proteins <- PeptideDataFrame$UpdateProteins
+    
+    PeptideDataFrame$SplitedUpdateProteins <- PeptideDataFrame$UpdateProteins
+    if(sum("data.table" %in% class(PeptideDataFrame))==0){
+      PeptideDataFrame<-data.table::data.table(PeptideDataFrame)
+    }
+    #as many lines as proteins per peptides
+    Peptide <-
+      data.table::data.table(tidyr::unnest(
+        PeptideDataFrame,
+        SplitedUpdateProteins = strsplit(PeptideDataFrame$SplitedUpdateProteins, ";")
+      ))
+    #keeps only the peptides that match a leading razor proteins
+    PeptideDataFrame <-
+      PeptideDataFrame[PeptideDataFrame$SplitedUpdateProteins %in% PeptideDataFrame$`Leading razor protein`,]
+    #Get localisation
+    Positions <-
+      matrix(stringr::str_locate(ProteinBank[PeptideDataFrame$SplitedUpdateProteins], gsub("I|L", "(I|L)", PeptideDataFrame$Sequence)), ncol =
+               2)
+    PeptideDataFrame[, c("Start position")] <- Positions[, 1]
+    PeptideDataFrame[, c("End position")] <- Positions[, 2]
+    PeptideDataFrame$"UpdatedSequence" <-
+      substr(ProteinBank[PeptideDataFrame$SplitedUpdateProteins], PeptideDataFrame$"Start position", PeptideDataFrame$"End position")
+    
     return(PeptideDataFrame)
   }

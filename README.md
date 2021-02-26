@@ -32,6 +32,24 @@ renv::install("47Lies/isoformnspectRe")
 
 ## Update peptides
 
+When using MaxQuant, we observed that some peptides were wrongly attributed. For example, some peptides were solely attributed to the Blast protein (the one that was found from the mRNA and look like a protein from UNIPROT) form while it should have been also attributed to the Original(the protein from UNIPROT previously mentionned). We came with a solution to make a new search of the peptide in the protein bank.
+
+The function have a multisession capacity
+```
+library("isoformnspectRe")
+ProteinBankFastaFilePath <- system.file("extdata",
+  "protein_bank.example.fasta",
+  package = "isoformnspectRe")
+PeptidePath <- system.file("extdata",
+  "peptides.example.txt",
+  package = "isoformnspectRe")
+options(datatable.integer64 = "numeric")
+Peptide <- data.table::fread(opt$Peptides, sep = "\t")
+DATATABLE_AnnotateProteotypic(PeptideDataFrame, ProteinBank, Threads = 1)
+```
+
+
+
 ## Render rmarkdown
 
 
