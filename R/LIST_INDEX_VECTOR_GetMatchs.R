@@ -68,7 +68,7 @@ LIST_INDEX_VECTOR_GetMatchs <-
 #' @import tidyr
 #' @rawNamespace import(data.table,except=c(shift))
 #' @export
-#' @example 
+#' @examples 
 #' library(isoformnspectRe)
 #' ProteinBankFastaFilePath <- system.file("extdata",
 #' "protein_bank.example.fasta",

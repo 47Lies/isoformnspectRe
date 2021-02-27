@@ -19,3 +19,16 @@ PeptideDataFrame Updated data frame with informations
 \description{
 DATAFRAME_AnnotateProteotypic Since we observe that some proteins are not present in the Proteins field, we decieded to
 }
+\examples{
+library(isoformnspectRe)
+ProteinBankFastaFilePath <- system.file("extdata",
+"protein_bank.example.fasta",
+package = "isoformnspectRe")
+ProteinBank <- readAAStringSet(ProteinBankFastaFilePath)
+PeptidePath <- system.file("extdata",
+                           "peptides.example.txt",
+                           package = "isoformnspectRe")
+options(datatable.integer64 = "numeric")
+Peptides <- data.table::fread(PeptidePath, sep = "\t")
+DATATABLE_AnnotateProteotypic(Peptides, ProteinBank, Threads = 1)
+}

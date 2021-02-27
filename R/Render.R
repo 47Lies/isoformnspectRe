@@ -87,6 +87,7 @@ RenderARegular<-function(RegularProt,
         SampleGroupName = SampleGroupName,
         SampleName = SampleName),
       clean = TRUE,
+      knit_root_dir="./",
       quiet = TRUE
     )
   }
@@ -183,6 +184,7 @@ RenderAnIsoform<-function(IsoformProt,
         SampleGroupName=SampleGroupName,
         SampleName=SampleName
       ),
+      knit_root_dir="./",
       clean = TRUE,
       quiet = TRUE
     )
@@ -288,6 +290,7 @@ RenderABlast<-function(BlastProt,
         SampleGroupName=SampleGroupName,
         SampleName=SampleName
       ),
+      knit_root_dir="./",
       clean = TRUE,
       quiet = TRUE
     )
