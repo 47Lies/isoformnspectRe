@@ -24,7 +24,7 @@ library(isoformnspectRe)
 ProteinBankFastaFilePath <- system.file("extdata",
 "protein_bank.example.fasta",
 package = "isoformnspectRe")
-ProteinBank <- readAAStringSet(ProteinBankFastaFilePath)
+ProteinBank <- Biostrings::readAAStringSet(ProteinBankFastaFilePath)
 PeptidePath <- system.file("extdata",
                            "peptides.example.txt",
                            package = "isoformnspectRe")
