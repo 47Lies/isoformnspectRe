@@ -326,12 +326,12 @@ server <- function(input,
   
   MaxQuantPeptides[Blast_Idx, "ProteinToPrint"] <- paste(
     "<a href=\"BlastProtein/",
-    gsub("[.,=\\|:]",
+    gsub("[[:punct:]]",
          "_", MaxQuantPeptides[Blast_Idx, "Leading.razor.protein"])
     ,
     ".html\" target=\"_blank\">",
     gsub(
-      pattern = "[.,=\\|:]",
+      pattern = "[[:punct:]]",
       replacement = " ",
       MaxQuantPeptides[Blast_Idx, "ProteinToPrint"]
     ),
@@ -341,12 +341,12 @@ server <- function(input,
   
   MaxQuantPeptides[Isoforms_Idx, "ProteinToPrint"] <- paste(
     "<a href=\"IsoformProtein/",
-    gsub("[.,=\\|:]",
+    gsub("[[:punct:]]",
          "_", MaxQuantPeptides[Isoforms_Idx, "Leading.razor.protein"])
     ,
     ".html\" target=\"_blank\">",
     gsub(
-      pattern = "[.,=\\|:]",
+      pattern = "[[:punct:]]",
       replacement = " ",
       MaxQuantPeptides[Isoforms_Idx, "ProteinToPrint"]
     ),
