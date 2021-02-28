@@ -17,9 +17,7 @@ UI <- function() {
     shinydashboard::dashboardHeader(
       title = shiny::span(
         tags$img(
-          src = system.file("extdata",
-                            "IsoAndSpe.png",
-                            package = "isoformnspectRe"),
+          src = "CurieIsoAndSpe.png",
           height = 48,
           width = 48
         ),
