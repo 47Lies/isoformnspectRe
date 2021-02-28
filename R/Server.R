@@ -269,16 +269,20 @@ server <- function(input,
                      MaxQuantPeptides[, paste(x, "Mean", sep = "_")] <<-
                        round(apply(MaxQuantPeptides[, InterestIntensities],
                                    1, mean), digits = 2)
-                   } else{
+                     MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")] <<-
+                       round(apply(MaxQuantPeptides[, UninterestIntensities],
+                                   1, mean), digits = 2)
+                     } else{
                      MaxQuantPeptides[, paste(x, "Infos", sep = "_")] <<-
                        MaxQuantPeptides[, InterestIntensities]
                      MaxQuantPeptides[, paste(x, "Mean", sep = "_")] <<-
                        round(MaxQuantPeptides[, InterestIntensities],
                              digits = 2)
+                     MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")] <<-
+                       round(MaxQuantPeptides[, UninterestIntensities],
+                             digits = 2)
                    }
-                   MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")] <<-
-                     round(apply(MaxQuantPeptides[, UninterestIntensities],
-                                 1, mean), digits = 2)
+                   
                    Progression <<- Progression + 1
                  }, SampleList = SampleList)
                })
