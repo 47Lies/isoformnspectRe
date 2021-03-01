@@ -1346,7 +1346,7 @@ The <font color=red>**red letters**</font> corresponds to the peptide match on t
         ProteinSequence[NewLines]<-paste(ProteinSequence[NewLines],"</br>",sep="")
       }
       ProteinSequence[Blocks]<-paste(ProteinSequence[Blocks],"&nbsp;",sep="")
-      ProteinSequence[1]<-paste("<div style=\"font-family:courier\">",
+      ProteinSequence[1]<-paste("<div style=\"font-family:monospace\">",
         ProteinSequence[1],
         sep="")
       ProteinSequence[length(ProteinSequence)]<-paste(ProteinSequence[length(ProteinSequence)],
