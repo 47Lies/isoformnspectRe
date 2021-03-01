@@ -914,7 +914,7 @@ Pep.Iso.Short.CoordPart<-aggregate(
         AAs[NewLines]<-paste(AAs[NewLines],"</br>",sep="")
       }
       AAs[Blocks]<-paste(AAs[Blocks],"&nbsp;",sep="")
-      AAs[1]<-paste("<div style=\"font-family:courier;font-weight: bold\">",
+      AAs[1]<-paste("<div style=\"font-family:monospace;font-weight: bold\">",
         AAs[1],
         sep="")
       AAs[length(AAs)]<-paste(AAs[length(AAs)],
