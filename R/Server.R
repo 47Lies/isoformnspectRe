@@ -151,7 +151,12 @@ utils::globalVariables(
     "SampleDescriptionPath",
     "IntensityName",
     "SampleColumnName",
-    "SampleGroupColumnName"
+    "SampleGroupColumnName",
+    ":=",
+    "!!",
+    "Leading razor protein",
+    "Unique (Proteins)"
+    
   )
 )
 
@@ -163,6 +168,7 @@ utils::globalVariables(
 #' @importFrom utils read.table
 #' @importFrom stats formula
 #' @importFrom shinyjqui orderInput
+#' @rawNamespace import(data.table, except = c(shift))
 #' @return shiny server
 #' @export
 #'
@@ -178,79 +184,91 @@ utils::globalVariables(
 server <- function(input,
                    output,
                    session) {
+  MaxIntensity <- NNonNullIntensity <- Protein <- Sequence <- NULL
   progress <- shiny::Progress$new()
   progress$set(message = "Read MaxQuant peptides file")
-  MaxQuantPeptides <- utils::read.table(PeptidePath,
+  # MaxQuantPeptides <- utils::read.table(PeptidePath,
+  #                                       header = TRUE,
+  #                                       sep = "\t",
+  #                                       quote = "\"")
+  options(datatable.integer64 = "numeric")
+  MaxQuantPeptides <- data.table::fread(PeptidePath,
                                         header = TRUE,
                                         sep = "\t",
                                         quote = "\"")
+  Intensities <- colnames(MaxQuantPeptides)[grep(IntensityName,
+                                                 colnames(MaxQuantPeptides))]
   ColnamesToKeep <- c(
     "Sequence",
     "Proteins",
-    "Leading.razor.protein",
-    "Start.position",
-    "End.position",
-    "Unique..Proteins.",
+    "Leading razor protein",
+    "Start position",
+    "End position",
+    "Unique (Proteins)",
     "PEP",
-    colnames(MaxQuantPeptides)[grep(paste0("^", gsub(" ", ".", IntensityName)),
-                                    colnames(MaxQuantPeptides))],
+    Intensities,
     "UpdateProteins",
     "NProteins"
   )
+  ColnamesToKeep <-
+    intersect(ColnamesToKeep, colnames(MaxQuantPeptides))
   progress$set(message = "Selecting columns of interest")
   MaxQuantPeptides <-
-    MaxQuantPeptides[, colnames(MaxQuantPeptides) %in% ColnamesToKeep]
+    MaxQuantPeptides[, ColnamesToKeep, with = FALSE]
   progress$set(message = "Determining proteotypic peptides")
   ProteotypicProteins <-
-    as.vector(MaxQuantPeptides[MaxQuantPeptides[, "Unique..Proteins."] == "yes", "Leading.razor.protein"])
+    unlist(MaxQuantPeptides[`Unique (Proteins)` == "yes", "Leading razor protein"], use.names = FALSE)
+  
   progress$set(message = "Reading sample description file")
-  SampleDescription <- read.table(
-    SampleDescriptionPath,
-    header = TRUE,
-    sep = "\t",
-    quote = "\""
-  )
+  SampleDescription <- data.table::fread(SampleDescriptionPath,
+                                         sep = "\t",
+                                         quote = "\"")
   progress$set(message = "Handling intensities")
-  MaxQuantPeptides <-
-    MaxQuantPeptides[rowSums(MaxQuantPeptides[, colnames(MaxQuantPeptides)[grep(gsub(" ", ".", IntensityName), colnames(MaxQuantPeptides))]]) > 0,]
-  Intensities <-
-    paste(gsub(" ", ".", IntensityName),
-          as.vector(SampleDescription[, SampleColumnName]),
-          sep = "")
-  #cat(Intensities)
-  MaxIntensities <- apply(MaxQuantPeptides[, Intensities],
-                          1, max)
-  MaxQuantPeptides[, Intensities] <-
-    round(MaxQuantPeptides[, Intensities] / MaxIntensities, digits = 2)
-  IntensitiesPrefix <- gsub(" ", ".", IntensityName)
+  #MaxQuantPeptides <-
+  #  MaxQuantPeptides[rowSums(MaxQuantPeptides[, colnames(MaxQuantPeptides)[grep(gsub(" ", ".", IntensityName), colnames(MaxQuantPeptides))]]) > 0,]
+  MaxQuantPeptides[, NNonNullIntensity := sum(as.double(.SD) > 0), by =  seq_len(nrow(MaxQuantPeptides)), .SDcols =
+                     Intensities]
+  MaxQuantPeptides <- MaxQuantPeptides[NNonNullIntensity > 0]
+  #MaxIntensities <- apply(MaxQuantPeptides[, Intensities],
+  #                        1, max)
+  MaxQuantPeptides[, MaxIntensity := max(as.double(.SD)), by =  seq_len(nrow(MaxQuantPeptides)), .SDcols =
+                     Intensities]
+  #MaxQuantPeptides[, Intensities] <-
+  #  round(MaxQuantPeptides[, Intensities] / MaxIntensities, digits = 2)
+  #apply(Intensities,function(x){
+  #      MaxQuantPeptides[,(x):=round(.SD/MaxIntensity,2),.SDcols=x]})
+  MaxQuantPeptides[, (Intensities) := lapply(.SD, function(x)
+    round(x / MaxIntensity, 2)), .SDcols = Intensities]
+  
+  IntensitiesPrefix <- IntensityName
   progress$set(message = "Extracting sample group")
+  
+  GRP <-
+    unlist(unique(SampleDescription[, SampleGroupColumnName, with = FALSE]), use.names =
+             FALSE)
+  
   SamplesByGroup <-
-    lapply(unique(SampleDescription[, SampleGroupColumnName]),
+    lapply(GRP,
            function(x, SampleDescription) {
-             as.vector(SampleDescription[SampleDescription[, SampleGroupColumnName] == x, SampleColumnName])
+             unlist(SampleDescription[get(SampleGroupColumnName) == x,][, .SD, .SDcols = SampleColumnName], use.names = FALSE)
            }, SampleDescription = SampleDescription)
-  names(SamplesByGroup) <-
-    unique(SampleDescription[, SampleGroupColumnName])
+  names(SamplesByGroup) <- GRP
   NonSamplesByGroup <-
-    lapply(unique(SampleDescription[, SampleGroupColumnName]),
+    lapply(GRP,
            function(x, SampleDescription) {
-             as.vector(SampleDescription[SampleDescription[, SampleGroupColumnName] != x, SampleColumnName])
+             unlist(SampleDescription[get(SampleGroupColumnName) != x,][, .SD, .SDcols = SampleColumnName], use.names = FALSE)
            }, SampleDescription = SampleDescription)
-  names(NonSamplesByGroup) <-
-    unique(SampleDescription[, SampleGroupColumnName])
-  SampleList <- c(SamplesByGroup,
-                  NonSamplesByGroup)
+  names(NonSamplesByGroup) <- GRP
   progress$set(message = "Creating informations columns")
-  NSampleGroups <-
-    length(unique(SampleDescription[, SampleGroupColumnName]))
+  NSampleGroups <- length(GRP)
   Progression <- 1
   withProgress(message = "Creating informations columns",
                min = 0,
                max = 1,
                {
-                 lapply(unique(SampleDescription[, SampleGroupColumnName]), function(x, SampleList) {
+                 lapply(GRP, function(x) {
                    incProgress(1 / NSampleGroups,
-                               detail = paste("Handling group", unique(SampleDescription[, SampleGroupColumnName])[[Progression]]))
+                               detail = paste("Handling group", GRP[Progression]))
                    InterestIntensities <-
                      paste(IntensitiesPrefix,
                            SamplesByGroup[[x]],
@@ -261,105 +279,107 @@ server <- function(input,
                            sep = "")
                    #cat(UninterestIntensities)
                    if (length(InterestIntensities) > 1) {
-                     MaxQuantPeptides[, paste(x, "Infos", sep = "_")] <<-
-                       apply(MaxQuantPeptides[, InterestIntensities], 1
-                             ,      function(y) {
-                               paste(y, sep = ",", collapse = ",")
-                             })
-                     MaxQuantPeptides[, paste(x, "Mean", sep = "_")] <<-
-                       round(apply(MaxQuantPeptides[, InterestIntensities],
-                                   1, mean), digits = 2)
-                     MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")] <<-
-                       round(apply(MaxQuantPeptides[, UninterestIntensities],
-                                   1, mean), digits = 2)
-                     } else{
-                     MaxQuantPeptides[, paste(x, "Infos", sep = "_")] <<-
-                       MaxQuantPeptides[, InterestIntensities]
-                     MaxQuantPeptides[, paste(x, "Mean", sep = "_")] <<-
-                       round(MaxQuantPeptides[, InterestIntensities],
-                             digits = 2)
-                     MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")] <<-
-                       round(MaxQuantPeptides[, UninterestIntensities],
-                             digits = 2)
+                     MaxQuantPeptides[, paste0(x, "_Infos") := paste(.SD, collapse = ","), by =
+                                        seq_len(nrow(MaxQuantPeptides)), .SDcols = InterestIntensities]
+                     MaxQuantPeptides[, paste0(x, "_Mean") := round(mean(as.numeric(.SD)),2), by =
+                                        seq_len(nrow(MaxQuantPeptides)), .SDcols = InterestIntensities]
+                     if(length(UninterestIntensities) > 1){
+                       MaxQuantPeptides[, paste0("Non_",x, "_Mean") := round(mean(as.numeric(.SD)),2), by =
+                                        seq_len(nrow(MaxQuantPeptides)), .SDcols = UninterestIntensities]
+                     }else{
+                       MaxQuantPeptides[, paste0("Non_",x, "_Mean") := .SD, by =
+                                          seq_len(nrow(MaxQuantPeptides)), .SDcols = UninterestIntensities]
+                     }
+                   } else{
+                     MaxQuantPeptides[, paste0(x, "_Infos") := .SD, by =
+                                        seq_len(nrow(MaxQuantPeptides)), .SDcols = InterestIntensities]
+                     MaxQuantPeptides[, paste0(x, "_Mean") := .SD, by =
+                                        seq_len(nrow(MaxQuantPeptides)), .SDcols = InterestIntensities]
+                     if(length(UninterestIntensities) > 1){
+                       MaxQuantPeptides[, paste0("Non_",x, "_Mean") := round(mean(as.numeric(.SD)),2), by =
+                                          seq_len(nrow(MaxQuantPeptides)), .SDcols = UninterestIntensities]
+                     }else{
+                       MaxQuantPeptides[, paste0("Non_",x, "_Mean") := .SD, by =
+                                          seq_len(nrow(MaxQuantPeptides)), .SDcols = UninterestIntensities]
+                     }
                    }
-                   
+                   MaxQuantPeptides[,paste("Log 2 ", x, "/Non ", x):=HandleFoldChange(
+                     round(
+                       log(get(paste0(x, "_Mean"))/get(paste0("Non_",x, "_Mean")),2)
+                       ,2)
+                   )]
                    Progression <<- Progression + 1
-                 }, SampleList = SampleList)
+                 })
                })
-  progress$set(message = "Handling fold change")
-  lapply(unique(SampleDescription[, SampleGroupColumnName]), function(x) {
-    MaxQuantPeptides[, paste("Log 2 ", x, "/Non ", x, sep = "")] <<-
-      HandleFoldChange(round(log(
-        MaxQuantPeptides[, paste(x, "Mean", sep = "_")] / MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")], 2
-      )))
-  })
+  #progress$set(message = "Handling fold change")
+  # lapply(unique(SampleDescription[, SampleGroupColumnName]), function(x) {
+  #   MaxQuantPeptides[, paste("Log 2 ", x, "/Non ", x, sep = "")] <<-
+  #     HandleFoldChange(round(log(
+  #       MaxQuantPeptides[, paste(x, "Mean", sep = "_")] / MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")], 2
+  #     )))
+  # })
+
   progress$set(message = "Filtering intensities")
   
-  MaxQuantPeptides <- MaxQuantPeptides[MaxIntensities > 0, ]
+  MaxQuantPeptides <- MaxQuantPeptides[MaxIntensity > 0,]
   
-  MaxQuantPeptides[, "ProteinToPrint"] <-
-    as.vector(MaxQuantPeptides[, "Leading.razor.protein"])
-  Blast_Idx <- grep("Blast=", MaxQuantPeptides[, "ProteinToPrint"])
-  Isoforms_Idx <-
-    intersect(grep("-[0-9]*\\|", MaxQuantPeptides[, "ProteinToPrint"]),
-              grep("UNIPROT=", MaxQuantPeptides[, "ProteinToPrint"]))
-  Regular_Bool <-
-    !1:length(MaxQuantPeptides[, "ProteinToPrint"]) %in% c(Blast_Idx, Isoforms_Idx)
-  
+  #MaxQuantPeptides[, "Protein"] <-
+  #  as.vector(MaxQuantPeptides[, "Leading.razor.protein"])
+  MaxQuantPeptides[,"Protein":=`Leading razor protein`]
+  BoolBlast <- grepl("Blast=", MaxQuantPeptides$Protein)
+  BoolIsoforms <-
+    grepl("-[0-9]*\\|", MaxQuantPeptides$Protein) &
+              grepl("UNIPROT=", MaxQuantPeptides$Protein)
+  BoolRegular <- !BoolIsoforms & !BoolBlast
+
   progress$set(message = "Creating HTML Link")
   
   #https://stackoverflow.com/questions/39039424/how-to-link-a-local-file-to-an-html-query-in-the-shiny-ui-r
   #points to a file in a www repertory located in the app.R file
-  MaxQuantPeptides[Regular_Bool, "ProteinToPrint"] <- paste(
+  MaxQuantPeptides[BoolRegular, Protein:=paste(
     "<a href=\"RegularSkeleton/",
     gsub("[[:punct:]]",
-         "_", MaxQuantPeptides[Regular_Bool, "Leading.razor.protein"]),
+         "_",`Leading razor protein`),
     ".html\" target=\"_blank\">",
     gsub(
       pattern = "[[:punct:]]",
       replacement = " ",
-      MaxQuantPeptides[Regular_Bool, "ProteinToPrint"]
+      `Leading razor protein`
     ),
     "</a>",
     sep = ""
-  )
-  
-  MaxQuantPeptides[Blast_Idx, "ProteinToPrint"] <- paste(
+  )]
+  MaxQuantPeptides[BoolBlast, Protein:=paste(
     "<a href=\"BlastProtein/",
     gsub("[[:punct:]]",
-         "_", MaxQuantPeptides[Blast_Idx, "Leading.razor.protein"])
-    ,
+         "_",`Leading razor protein`),
     ".html\" target=\"_blank\">",
     gsub(
       pattern = "[[:punct:]]",
       replacement = " ",
-      MaxQuantPeptides[Blast_Idx, "ProteinToPrint"]
+      `Leading razor protein`
     ),
     "</a>",
     sep = ""
-  )
-  
-  MaxQuantPeptides[Isoforms_Idx, "ProteinToPrint"] <- paste(
+  )]
+  MaxQuantPeptides[BoolIsoforms, Protein:=paste(
     "<a href=\"IsoformProtein/",
     gsub("[[:punct:]]",
-         "_", MaxQuantPeptides[Isoforms_Idx, "Leading.razor.protein"])
-    ,
+         "_",`Leading razor protein`),
     ".html\" target=\"_blank\">",
     gsub(
       pattern = "[[:punct:]]",
       replacement = " ",
-      MaxQuantPeptides[Isoforms_Idx, "ProteinToPrint"]
+      `Leading razor protein`
     ),
     "</a>",
     sep = ""
-  )
+  )]
   progress$set(message = "Reformating sequence")
-  MaxQuantPeptides[, "Sequence"] <-
-    as.vector(MaxQuantPeptides[, "Sequence"])
-  MaxQuantPeptides[, "Sequence"] <-
-    TrimSequenceOutput(MaxQuantPeptides[, "Sequence"])
+  MaxQuantPeptides[, Sequence:=TrimSequenceOutput(Sequence)]
   progress$close()
   SelectedProteins <- shiny::reactive({
+    req(input$Group)
     mRNA_Regexp <- "^str"
     UNIPROT_Regexp <- "\\|[A-Z0-9-]+\\|"
     Canonical_Regexp <- "sp\\|[A-Z0-9]+\\|"
@@ -370,9 +390,9 @@ server <- function(input,
     Match_Regexp <- "="
     
     PresentProteins <-
-      unique(as.vector(MaxQuantPeptides[, "Leading.razor.protein"]))
+      unique(unlist(MaxQuantPeptides[, "Leading razor protein"]))
     LRPs <-
-      unique(as.vector(MaxQuantPeptides[, "Leading.razor.protein"]))
+      unique(unlist(MaxQuantPeptides[, "Leading razor protein"]))
     NoBlast <- LRPs[grep("Blast=", LRPs, invert = TRUE)]
     Shorts.NoBlast <-
       gsub("\\|.*$", "", gsub(pattern = "^[^\\|]*\\|", "", NoBlast))
@@ -441,28 +461,28 @@ server <- function(input,
       SelectedProt <- intersect(SelectedProt,
                                 Matching_Prot)
     }
-    GrpMean <- paste(input$Group, "Mean", sep = "_")
-    NonGrpMean <- paste("Non", input$Group, "Mean", sep = "_")
+    GrpMean <- base::paste(as.vector(input$Group), "Mean", sep = "_")
+    NonGrpMean <- base::paste("Non", as.vector(input$Group), "Mean", sep = "_")
     GrpLFC <-
-      paste("Log 2 ", input$Group, "/Non ", input$Group, sep = "")
+      base::paste("Log 2 ", as.vector(input$Group), "/Non ", as.vector(input$Group), sep = " ")
     InfosNames <-
-      paste(input$SampleGroupsColumns_order, "Infos", sep = "_")
+      base::paste(as.vector(input$SampleGroupsColumns_order[["text"]]), "Infos", sep = "_")
     KOL <- c("Sequence",
-             "ProteinToPrint",
+             "Protein",
              InfosNames,
              GrpMean,
              NonGrpMean,
              GrpLFC)
+
     #cat(KOL)
     #cat(colnames(MaxQuantPeptides))
     #cat(KOL[!KOL %in% colnames(MaxQuantPeptides)])
     if (input$Proteotypic) {
-      MaxQuantPeptides[MaxQuantPeptides[, "Leading.razor.protein"] %in% SelectedProt &
-                         MaxQuantPeptides[, "Unique..Proteins."] == "yes",
-                       KOL]
+      return(MaxQuantPeptides[`Leading razor protein` %in% SelectedProt &
+                         `Unique (Proteins)` == "yes", KOL, with = FALSE])
     } else{
-      MaxQuantPeptides[MaxQuantPeptides[, "Leading.razor.protein"] %in% SelectedProt,
-                       KOL]
+      return(MaxQuantPeptides[`Leading razor protein` %in% SelectedProt,
+                       KOL,with=FALSE])
     }
   })
   output$Button12 <- shiny::renderUI({
@@ -471,7 +491,7 @@ server <- function(input,
   })
   output$SampleGroupOrder <- shiny::renderUI({
     ColumnNames <-
-      unique(as.vector(SampleDescription[, SampleGroupColumnName]))
+      unique(unlist(SampleDescription[,.SD,.SDcols=SampleGroupColumnName],use.names=FALSE))
     orderInput(inputId = "SampleGroupsColumns",
                label = "Reorder sample group order",
                items = ColumnNames)
@@ -488,7 +508,7 @@ server <- function(input,
         1,
       target = 'row'
     ),
-    options = LocalOptions(LIST_SampleNames = SamplesByGroup[input$SampleGroupsColumns_order])
+    options = LocalOptions(LIST_SampleNames = SamplesByGroup[input$SampleGroupsColumns_order$text])
   )
   
   
@@ -498,11 +518,13 @@ server <- function(input,
   })
   output$Group <- shiny::renderUI({
     req(input$SampleGroupsColumns_order)
+    #cat(names(input$SampleGroupsColumns_order))
+    #cat(unlist(input$SampleGroupsColumns_order,names=FALSE))
     selectInput(
-      "Group",
+      inputId="Group",
       label = "Group of interest:",
-      choices = input$SampleGroupsColumns_order,
-      selected = input$SampleGroupsColumns_order[1]
+      choices = unlist(input$SampleGroupsColumns_order$text,use.names = FALSE),
+      multiple=FALSE
     )
   })
   output$Description <- shiny::renderUI({

@@ -24,18 +24,18 @@
 #' Peptides<-fread(
 #'  P_FilePath,
 #'  integer64="double")
-#' SampleNames<-list("siNT"=c("siNT_48.1",
-#' "siNT_48.2",
-#' "siNT_48.3",
-#' "siNT_72.1",
-#' "siNT_72.2",
-#' "siNT_72.3"),
-#' "siSF3B1"=c("siSF3B1.1",
-#' "siSF3B1.2",
-#' "siSF3B1.3",
-#' "siSRSF1.1",
-#' "siSRSF1.2",
-#' "siSRSF1.3"))
+#' SampleNames<-list("siNT"=c("siNT_48-1",
+#' "siNT_48-2",
+#' "siNT_48-3",
+#' "siNT_72-1",
+#' "siNT_72-2",
+#' "siNT_72-3"),
+#' "siSF3B1"=c("siSF3B1-1",
+#' "siSF3B1-2",
+#' "siSF3B1-3",
+#' "siSRSF1-1",
+#' "siSRSF1-2",
+#' "siSRSF1-3"))
 #' Samples <- unlist(SampleNames)
 #' MaxIntensities <- apply(Peptides[,paste("Intensity",Samples),with=FALSE],1,max)
 #' Peptides[,
