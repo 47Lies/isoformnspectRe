@@ -46,7 +46,8 @@ TrimSequenceOutput <- function(Peptide) {
 #' @param LIST_SparlinesOptions options for sparkline
 #'
 #' @return List of options for data table including sparklines
-#'
+#' @export
+#' 
 #' @examples
 #' SamplesNames <- list(
 #' group_un=c("echantillon un","echantillon deux"),
@@ -169,6 +170,8 @@ utils::globalVariables(
 #' @importFrom stats formula
 #' @importFrom shinyjqui orderInput
 #' @rawNamespace import(data.table, except = c(shift))
+#' @rawNamespace import(plotly, except =c(slice,config))
+#' @import DT
 #' @return shiny server
 #' @export
 #'
@@ -495,7 +498,7 @@ server <- function(input,
   output$SampleGroupOrder <- shiny::renderUI({
     ColumnNames <-
       unique(unlist(SampleDescription[,.SD,.SDcols=SampleGroupColumnName],use.names=FALSE))
-    orderInput(inputId = "SampleGroupsColumns",
+    shinyjqui::orderInput(inputId = "SampleGroupsColumns",
                label = "Reorder sample group order",
                items = ColumnNames)
   })
@@ -507,7 +510,7 @@ server <- function(input,
     escape = FALSE,
     selection = list(
       mode = "multiple",
-      selected = event_data("plotly_selected", priority = "event")$pointNumber +
+      selected = plotly::event_data("plotly_selected", priority = "event")$pointNumber +
         1,
       target = 'row'
     ),
@@ -517,7 +520,7 @@ server <- function(input,
   
   proxy = DT::dataTableProxy('Peptides')
   observeEvent(input$clear, {
-    proxy %>% selectRows(NULL)
+    DT::selectRows(proxy,NULL)
   })
   output$Group <- shiny::renderUI({
     req(input$SampleGroupsColumns_order)
@@ -526,7 +529,7 @@ server <- function(input,
     selectInput(
       inputId="Group",
       label = "Group of interest:",
-      choices = unlist(input$SampleGroupsColumns_order$text,use.names = FALSE),
+      choices = as.vector(input$SampleGroupsColumns_order$text),
       multiple=FALSE
     )
   })
@@ -616,7 +619,7 @@ server <- function(input,
   })
   output$scatterPlotly <- plotly::renderPlotly({
     SP <- SelectedProteins()
-    p <- plot_ly(
+    p <- plotly::plot_ly(
       data = SP,
       x = formula(paste("~", input$Group, "_Mean", sep = "")),
       y = formula(paste("~Non_", input$Group, "_Mean", sep = "")),
@@ -625,12 +628,12 @@ server <- function(input,
       type = "scatter",
       marker = list(opacity = 0.2, color = "black")
     )
-    p <- layout(p, showlegend = FALSE)
-    p <- toWebGL(p)
+    p <- plotly::layout(p, showlegend = FALSE)
+    p <- plotly::toWebGL(p)
     s <- input$Peptides_rows_selected
     if (!length(s))
       return(p)
-    add_trace(
+    plotly::add_trace(
       p,
       data = SP[s, , drop = FALSE],
       x = formula(paste("~", input$Group, "_Mean", sep = "")),
