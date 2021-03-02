@@ -187,6 +187,7 @@ utils::globalVariables(
 server <- function(input,
                    output,
                    session) {
+  #cat("1\n")
   MaxIntensity <- NNonNullIntensity <- Protein <- Sequence <- NULL
   progress <- shiny::Progress$new()
   progress$set(message = "Read MaxQuant peptides file")
@@ -324,7 +325,8 @@ server <- function(input,
   #       MaxQuantPeptides[, paste(x, "Mean", sep = "_")] / MaxQuantPeptides[, paste("Non", x, "Mean", sep = "_")], 2
   #     )))
   # })
-
+  #cat("2\n")
+  
   progress$set(message = "Filtering intensities")
   
   MaxQuantPeptides <- MaxQuantPeptides[MaxIntensity > 0,]
@@ -384,8 +386,11 @@ server <- function(input,
   progress$set(message = "Reformating sequence")
   MaxQuantPeptides[, Sequence:=TrimSequenceOutput(Sequence)]
   progress$close()
+  #cat("3\n")
   SelectedProteins <- shiny::reactive({
     req(input$Group)
+    #cat("4\n")
+    
     mRNA_Regexp <- "^str"
     UNIPROT_Regexp <- "\\|[A-Z0-9-]+\\|"
     Canonical_Regexp <- "sp\\|[A-Z0-9]+\\|"
@@ -472,7 +477,7 @@ server <- function(input,
     GrpLFC <-
       base::paste("Log 2 ", as.vector(input$Group), "/Non ", as.vector(input$Group), sep = " ")
     InfosNames <-
-      base::paste(as.vector(input$SampleGroupsColumns_order[["text"]]), "Infos", sep = "_")
+      base::paste(as.vector(input$SampleGroupsColumns_order), "Infos", sep = "_")
     KOL <- c("Sequence",
              "Protein",
              InfosNames,
@@ -482,7 +487,7 @@ server <- function(input,
 
     #cat(KOL)
     #cat(colnames(MaxQuantPeptides))
-    #cat(KOL[!KOL %in% colnames(MaxQuantPeptides)])
+    #cat("fdsfds",KOL[!KOL %in% colnames(MaxQuantPeptides)],"\n")
     if (input$Proteotypic) {
       return(MaxQuantPeptides[`Leading razor protein` %in% SelectedProt &
                          `Unique (Proteins)` == "yes", KOL, with = FALSE])
@@ -491,11 +496,8 @@ server <- function(input,
                        KOL,with=FALSE])
     }
   })
-  output$Button12 <- shiny::renderUI({
-    ##req(input$pep)
-    actionButton("page_12", "Proceed to sample description")
-  })
   output$SampleGroupOrder <- shiny::renderUI({
+    #cat("6\n")
     ColumnNames <-
       unique(unlist(SampleDescription[,.SD,.SDcols=SampleGroupColumnName],use.names=FALSE))
     shinyjqui::orderInput(inputId = "SampleGroupsColumns",
@@ -514,7 +516,7 @@ server <- function(input,
         1,
       target = 'row'
     ),
-    options = LocalOptions(LIST_SampleNames = SamplesByGroup[input$SampleGroupsColumns_order$text])
+    options = LocalOptions(LIST_SampleNames = SamplesByGroup[input$SampleGroupsColumns_order])
   )
   
   
@@ -523,17 +525,19 @@ server <- function(input,
     DT::selectRows(proxy,NULL)
   })
   output$Group <- shiny::renderUI({
+    #cat("7\n")
     req(input$SampleGroupsColumns_order)
     #cat(names(input$SampleGroupsColumns_order))
     #cat(unlist(input$SampleGroupsColumns_order,names=FALSE))
     selectInput(
       inputId="Group",
       label = "Group of interest:",
-      choices = as.vector(input$SampleGroupsColumns_order$text),
+      choices = input$SampleGroupsColumns_order,
       multiple=FALSE
     )
   })
   output$Description <- shiny::renderUI({
+    #cat("8\n")
     laius <- ""
     if (input$Proteotypic) {
       laius <-
