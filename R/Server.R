@@ -196,6 +196,9 @@ server <- function(input,
                                         header = TRUE,
                                         sep = "\t",
                                         quote = "\"")
+  if(length(grep(" $",IntensityName))==0){
+    IntensityName<-paste0(IntensityName," ")
+  }
   Intensities <- colnames(MaxQuantPeptides)[grep(IntensityName,
                                                  colnames(MaxQuantPeptides))]
   ColnamesToKeep <- c(

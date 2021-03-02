@@ -67,6 +67,9 @@ RenderARegular<-function(RegularProt,
                      "IsoAndSpe.png",
                      package = "isoformnspectRe")
   Temp<-tempdir()
+  if(length(grep(" $",IntensityPrefix))==0){
+    IntensityPrefix<-paste0(IntensityPrefix," ")
+  }
   if (!file.exists(paste0(OutputDir, "/RegularSkeleton/", FileName, ".html", sep = ""))) {
       rmarkdown::render(
       input = Rmd,
@@ -164,6 +167,9 @@ RenderAnIsoform<-function(IsoformProt,
                       "IsoAndSpe.png",
                       package = "isoformnspectRe")
   Temp<-tempdir()
+  if(length(grep(" $",IntensityPrefix))==0){
+    IntensityPrefix<-paste0(IntensityPrefix," ")
+  }
   if (!file.exists(paste0(OutputDir, "/IsoformProtein/", FileName, ".html"))) {
     rmarkdown::render(
       input = Rmd,
@@ -269,6 +275,9 @@ RenderABlast<-function(BlastProt,
                       "IsoAndSpe.png",
                       package = "isoformnspectRe")
   Temp<-tempdir()
+  if(length(grep(" $",IntensityPrefix))==0){
+    IntensityPrefix<-paste0(IntensityPrefix," ")
+  }
   if(!file.exists(paste0(OutputDir, "/BlastProtein/", FileName, ".html"))) {
     rmarkdown::render(
       input = Rmd,
