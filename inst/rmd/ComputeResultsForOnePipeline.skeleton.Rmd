@@ -134,33 +134,6 @@ a:active {
 <!-- mRNARegexp: "strngt" -->
 <!--   - Regexp to match anything that belongs to the mrna entries -->
 
-<!--To be remove after presentation-->
-
-# Medulloblastoma
-
-* <a href="https://www.cancer.gov/rare-brain-spine-tumor/tumors/medulloblastoma">Brain Child Tumor</a>
-
-* 4 subtypes:
-
-  + WNT (5 patients)
-
-  + SHH (10 patients)
-
-  + Group 3 (10 patients)
-
-  + Group 4 (14 patients)
-
-  + ~12 fractions per patient
-
-  + In this present study: 4 G3 patients / 4 G4 patients 
-
-* Datas:
-
-  + RNA-Seq stranded pair-end
-
-  + Mass Spec SILAC .raw
-
-<!--/To be remove after presentation-->
 
 
 ```{r setup,message=FALSE}

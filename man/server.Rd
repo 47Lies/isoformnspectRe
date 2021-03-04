@@ -26,6 +26,6 @@ GlobalPath<-system.file("extdata",
  "Global.R",
   package = "isoformnspectRe")
 source(GlobalPath,local=TRUE)
-shiny::shinyApp(UI,server)
+shiny::shinyApp(ui,server)
 }
 }

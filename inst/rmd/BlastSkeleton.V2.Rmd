@@ -48,7 +48,7 @@ if(!"BLAST" %in% CurrentList) BLAST<-read.table(
   sep = "\t",
   quote = "\"",
   stringsAsFactors = TRUE)
-if(!"SampleDescription" %in% CurrentList) SampleDescription <- read.table(params$SampleDescription, header = TRUE)
+if(!"SampleDescription" %in% CurrentList) SampleDescription <- data.table::fread(params$SampleDescription, header = TRUE)
  
 BlastPalette<-viridis(3)
 #source(params$Utils)
@@ -81,21 +81,29 @@ LocalPeptides[, (LightIntensitiesName) := lapply(.SD, function(x) x/MaxIntensiti
 
 
 #SampleDescription <- read.table(params$SampleDescription, header = TRUE)
-Groups <- as.vector(SampleDescription[,params$SampleGroupName])
-Groups <- Groups[!duplicated(Groups)]
-SampleDescription[,params$SampleGroupName] <-
-  factor(as.vector(SampleDescription[,params$SampleGroupName]),
-         levels = c(Groups))
+# SampleDescription[,params$SampleGroupName] <-
+#   factor(as.vector(SampleDescription[,params$SampleGroupName]),
+#          levels = c(Groups))
 if(length(grep(" $",params$IntensityPrefix))>0){
   UsablePrefix<-params$IntensityPrefix
 }else{
   UsablePrefix<-paste(params$IntensityPrefix," ",sep="")
 }
-SamplesByGroup <- lapply(as.vector(Groups),
-                         function(x, SampleDescription) {
-                           paste(UsablePrefix, as.vector(SampleDescription[SampleDescription[,params$SampleGroupName] == x, params$SampleName]),sep="")
-                         }, SampleDescription = SampleDescription)
+Groups <- unique(unlist(SampleDescription[,params$SampleGroupName,with=FALSE],use.names=FALSE))
+Groups <- Groups[!duplicated(Groups)]
+# SamplesByGroup <- lapply(as.vector(Groups),
+#                          function(x, SampleDescription) {
+#                            paste(UsablePrefix, as.vector(SampleDescription[SampleDescription[,params$SampleGroupName] == x, params$SampleName]),sep="")
+#                          }, SampleDescription = SampleDescription)
+# names(SamplesByGroup) <- Groups
+
+SamplesByGroup <-
+  lapply(Groups,
+         function(x, SampleDescription) {
+           paste0(UsablePrefix,unlist(SampleDescription[get(params$SampleGroupName) == x, ][, .SD, .SDcols = params$SampleName], use.names = FALSE))
+         }, SampleDescription = SampleDescription)
 names(SamplesByGroup) <- Groups
+
 for(LocalGroup in Groups) {
   LocalPeptides[, paste(LocalGroup, "Infos") := paste(.SD, collapse = ","), .SDcols =
                   SamplesByGroup[[LocalGroup]], by = Sequence]

@@ -9,8 +9,8 @@
 #' @export
 #'
 #' @examples
-#' ui<-UI()
-UI <- function() {
+#' ui<-ui()
+ui <- function() {
   UI <- shinydashboard::dashboardPage(
     title = 'Proteogenomic Isoforms Group Comparison',
     skin = "yellow",

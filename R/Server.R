@@ -489,11 +489,11 @@ server <- function(input,
     #cat(colnames(MaxQuantPeptides))
     #cat("fdsfds",KOL[!KOL %in% colnames(MaxQuantPeptides)],"\n")
     if (input$Proteotypic) {
-      return(MaxQuantPeptides[`Leading razor protein` %in% SelectedProt &
-                         `Unique (Proteins)` == "yes", KOL, with = FALSE])
+      MaxQuantPeptides[`Leading razor protein` %in% SelectedProt &
+                         `Unique (Proteins)` == "yes", KOL, with = FALSE]
     } else{
-      return(MaxQuantPeptides[`Leading razor protein` %in% SelectedProt,
-                       KOL,with=FALSE])
+      MaxQuantPeptides[`Leading razor protein` %in% SelectedProt,
+                       KOL,with=FALSE]
     }
   })
   output$SampleGroupOrder <- shiny::renderUI({

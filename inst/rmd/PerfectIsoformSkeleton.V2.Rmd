@@ -44,7 +44,7 @@ if("UpdatedSequence" %in% colnames(PEPTIDES)){
   PEPTIDES$Sequence<-PEPTIDES$UpdatedSequence
 }}
 CurrentList<-ls()
-if(!"SampleDescription" %in% CurrentList) SampleDescription <- read.table(params$SampleDescription, header = TRUE)
+if(!"SampleDescription" %in% CurrentList) SampleDescription <- data.table::fread(params$SampleDescription, header = TRUE)
  
 #source("./SharedFunctionAcrossRmd.R")
 #source(params$Utils)
@@ -72,21 +72,25 @@ MaxIntensities<-apply(
 LocalPeptides[, (LightIntensitiesName) := lapply(.SD, function(x) x/MaxIntensities), .SDcols = LightIntensitiesName]
 
 
-#SampleDescription <- read.table(params$SampleDescription, header = TRUE)
-Groups <- as.vector(SampleDescription[,params$SampleGroupName])
-Groups <- Groups[!duplicated(Groups)]
-SampleDescription[,params$SampleGroupName] <-
-  factor(as.vector(SampleDescription[,params$SampleGroupName]),
-         levels = c(Groups))
+
 if(length(grep(" $",params$IntensityPrefix))>0){
   UsablePrefix<-params$IntensityPrefix
 }else{
   UsablePrefix<-paste(params$IntensityPrefix," ",sep="")
 }
-SamplesByGroup <- lapply(as.vector(Groups),
-                         function(x, SampleDescription) {
-                           paste(UsablePrefix, as.vector(SampleDescription[SampleDescription[,params$SampleGroupName] == x, params$SampleName]),sep="")
-                         }, SampleDescription = SampleDescription)
+Groups <- unique(unlist(SampleDescription[,params$SampleGroupName,with=FALSE],use.names=FALSE))
+Groups <- Groups[!duplicated(Groups)]
+# SamplesByGroup <- lapply(as.vector(Groups),
+#                          function(x, SampleDescription) {
+#                            paste(UsablePrefix, as.vector(SampleDescription[SampleDescription[,params$SampleGroupName] == x, params$SampleName]),sep="")
+#                          }, SampleDescription = SampleDescription)
+# names(SamplesByGroup) <- Groups
+
+SamplesByGroup <-
+  lapply(Groups,
+         function(x, SampleDescription) {
+           paste0(UsablePrefix,unlist(SampleDescription[get(params$SampleGroupName) == x, ][, .SD, .SDcols = params$SampleName], use.names = FALSE))
+         }, SampleDescription = SampleDescription)
 names(SamplesByGroup) <- Groups
 
 for(LocalGroup in Groups) {

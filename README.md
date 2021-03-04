@@ -52,7 +52,29 @@ DATATABLE_AnnotateProteotypic(PeptideDataFrame, ProteinBank, Threads = 1)
 
 ## Render rmarkdown
 
+Based on a files obtained through the Iso and Spe pipeline. There is 3 archetypes of markdowns if the mrna match an isoform, have a blast hit or is a perfect match.
 
+```
+library("isoformnspectRe")
+ProteinBankFastaFilePath <- system.file("extdata", "protein_bank.example.fasta", package = "isoformnspectRe")
+PepFilePath <- system.file("extdata", "peptides.example.txt", package = "isoformnspectRe")
+IntensityPrefix <- "Intensity "
+Pep<-read.table(PepFilePath, header=TRUE,sep="\t", quote="\"")
+ProteinOfInterest <- unique(Pep$Leading.razor.protein)
+ProteinOfInterest <- ProteinOfInterest[grep("UNIPROT=",ProteinOfInterest)]
+ProteinOfInterest <- ProteinOfInterest[grep("-",ProteinOfInterest,invert=TRUE)][1]
+SampleDescriptionFilePath <- system.file("extdata",  "SampleDescription.txt", package = "isoformnspectRe")
+SampleGroupName <- "LooseSampleGroup"
+SampleName <- "SampleName"
+RenderARegular(RegularProt=ProteinOfInterest,
+ProteinBankFastaFilePath=ProteinBankFastaFilePath,
+PepFilePath=PepFilePath,
+SampleDescriptionFilePath=SampleDescriptionFilePath,
+IntensityPrefix=IntensityPrefix,
+SampleGroupName=SampleGroupName,
+SampleName=SampleName,
+OutputDir=tempdir())
+```
 
 ## ShinyApp
 
