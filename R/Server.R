@@ -182,7 +182,7 @@ utils::globalVariables(
 #'  "Global.R",
 #'   package = "isoformnspectRe")
 #' source(GlobalPath,local=TRUE)
-#' shiny::shinyApp(UI,server)
+#' shiny::shinyApp(ui,server)
 #' }
 server <- function(input,
                    output,
