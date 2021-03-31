@@ -31,7 +31,7 @@ ui <- function() {
       shiny::checkboxInput(
         inputId = "Proteotypic",
         label = "Proteotypic peptides only",
-        value = TRUE,
+        value = FALSE,
         width = NULL
       ),
       shiny::checkboxInput(

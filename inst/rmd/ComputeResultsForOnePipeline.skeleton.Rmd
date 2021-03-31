@@ -789,13 +789,14 @@ The **PEPTIDES** tables contains all the informations relatives to the peptides.
 
 The **SequenceInHTML** is a fasta friendly representation of the protein sequence. The red parts are the peptides matchs on the sequence. They might be some overlaping peptides due to misscleavage.
 
-```{r}
+```{r eval=params$PEPTIDES_PART,echo=FALSE}
 
 
 Isoforms<-c(ProteinsInMS.NoContam.mRNA.PerfectMatch.Iso,
 ProteinsInMS.NoContam.Swissprot.Iso)
 
 Isoforms.Proteotypic<-Isoforms[Isoforms %in% Pep$Proteins]
+if(length(Isoforms.Proteotypic)){
 Pep.Iso<-data.frame(Pep[Pep$`Leading razor protein` %in% Isoforms.Proteotypic,])
 ShortNames<-c("Leading.razor.protein",
               "Proteins",
@@ -1025,7 +1026,9 @@ Pep.Iso.Short.CoordPart<-aggregate(
                 escape=FALSE,
                 extensions = 'Responsive'
                 )
-  
+}else{
+  cat("No isoforms founded")
+}
 ```
 
 # Pep score
@@ -1592,65 +1595,4 @@ sessionInfo()
 ```
 
 
-```{r}
-ProteinBank.Names<-names(ProteinBank)
-SP_Canonical<-ProteinBank.Names[
-  intersect(
-    grep("^sp",ProteinBank.Names),
-    grep("-[0-9]*\\|",ProteinBank.Names,invert=TRUE))]
-SP_Canonical.Short<-gsub(" .*","",SP_Canonical)
-BlastNames<-ProteinBank.Names[
-  grep("Blast=",ProteinBank.Names)]
-BlastHitNames<-gsub(".*Blast=","",BlastNames)
-SP_Canonical.NoMrna.Short<-SP_Canonical.Short[!SP_Canonical.Short %in% BlastHitNames]
-SP_Canonical.NoMrna.InMS.Short<-SP_Canonical.NoMrna.Short[SP_Canonical.NoMrna.Short %in% ProteinsInMS.NoContam]
-SP_Canonical.NoMrna.InMS.Short<-gsub(
-  "\\|.*",
-  "",
-  gsub(
-    "sp\\|",
-    "",
-    SP_Canonical.NoMrna.InMS.Short
-  )
-)
-write.table(data.frame(UNIPROT_ID=SP_Canonical.NoMrna.InMS.Short),
-            "PURE_CANONICAL.NomRNA.UNIPROT_ID.txt",
-            row.names = FALSE,
-            quote=FALSE,
-            sep="\t")
-```
 
-```{r}
-ProteinBank.Names<-names(ProteinBank)
-CommonUniprot<-ProteinBank.Names[grep("(UNIPROT|Blast)=",ProteinBank.Names)]
-CommonUniprot<-gsub("^[^\\|]*\\|",
-                    "",
-                    CommonUniprot)
-CommonUniprot<-gsub("\\|.*",
-                    "",
-                    CommonUniprot)
-
-write.table(data.frame(UNIPROT_ID=CommonUniprot),
-            "PRESENT_SPECTRO_RNASEQ.UNIPROT_ID.txt",
-            row.names = FALSE,
-            quote=FALSE,
-            sep="\t")
-```
-
-
-    
-<!--To be remove after presentation-->
-
-# What to do next ?
-
-* MSGF+ more cluster friendly
-
-* Compare with whole UNIPROT
-
-* Compare with SWISSPROT Canonical Only
-
-* UNIPROT but no mRNA ?
-
-* UNIPROT and mRNA ?
-
-<!--/To be remove after presentation-->
