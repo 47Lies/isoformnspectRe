@@ -789,14 +789,13 @@ The **PEPTIDES** tables contains all the informations relatives to the peptides.
 
 The **SequenceInHTML** is a fasta friendly representation of the protein sequence. The red parts are the peptides matchs on the sequence. They might be some overlaping peptides due to misscleavage.
 
-```{r eval=params$PEPTIDES_PART,echo=FALSE}
+```{r}
 
 
 Isoforms<-c(ProteinsInMS.NoContam.mRNA.PerfectMatch.Iso,
 ProteinsInMS.NoContam.Swissprot.Iso)
-
+if(length(Isoforms)){
 Isoforms.Proteotypic<-Isoforms[Isoforms %in% Pep$Proteins]
-if(length(Isoforms.Proteotypic)){
 Pep.Iso<-data.frame(Pep[Pep$`Leading razor protein` %in% Isoforms.Proteotypic,])
 ShortNames<-c("Leading.razor.protein",
               "Proteins",
@@ -1026,9 +1025,7 @@ Pep.Iso.Short.CoordPart<-aggregate(
                 escape=FALSE,
                 extensions = 'Responsive'
                 )
-}else{
-  cat("No isoforms founded")
-}
+  }
 ```
 
 # Pep score
@@ -1132,6 +1129,7 @@ The <font color=red>**red letters**</font> corresponds to the peptide match on t
   MrnaOnlyPeptideBank$Proteins<-gsub(";Origin=3'",
                                      "",
                                      MrnaOnlyPeptideBank$Proteins)
+  if(dim(MrnaOnlyPeptideBank)[1]!=0){
   MrnaOnly.CoordPart<-aggregate(
     MrnaOnlyPeptideBank[,c("Start.position",
                            "End.position",
@@ -1489,6 +1487,22 @@ The <font color=red>**red letters**</font> corresponds to the peptide match on t
     rownames=FALSE,
     extensions = 'Responsive',
     options=list(columnDefs=list(list(className="none",targets=5))))
+
+}else{
+
+  cat("No proteins from mRNA whitout perfect match with UNIPROT")
+  MrnaOnly<-MrnaOnly.NamePart
+  MrnaOnly.Informations<-matrix(FALSE,nrow=length(ProteinsInMS.NoContam.Mrna.MrnaOnly.NameInPeptide),ncol=8)
+  rownames(MrnaOnly.Informations)<-as.vector(MrnaOnly$Name)
+  colnames(MrnaOnly.Informations)<-c("SAAV",
+                                     "Insertion",
+                                     "Deletion",
+                                     "SAAV_In_Peptide",
+                                     "Insertion_In_Peptide",
+                                     "Deletion_In_Peptide",
+                                     "Peptide_Not_In_Blast",
+                                     "Not_In_Blast")
+}
   MrnaOnly.Informations<-data.frame(MrnaOnly.Informations)
 ```
 
@@ -1499,74 +1513,114 @@ The <font color=red>**red letters**</font> corresponds to the peptide match on t
 
 ## SAAV
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$SAAV)!=0){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$SAAV],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$SAAV)==0) cat("No proteins with SAAV\n")
+}
 ```
 
 ## SAAV in peptides
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$SAAV_In_Peptide)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$SAAV_In_Peptide],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$SAAV)==0) cat("No proteins with peptides in SAAV\n")
+}
 ```
 
 ## Insertion
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$Insertion)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Insertion],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$SAAV)==0) cat("No proteins with Insertion\n")
+}
 ```
 
 ## Insertion in peptides
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$Insertion_In_Peptide)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Insertion_In_Peptide],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$SAAV)==0) cat("No proteins with peptide in Insertion\n")
+}
 ```
 
 ## Deletion
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$Deletion)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Deletion],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$Deletion)==0) cat("No proteins with Deletion\n")
+}
 ```
 
 ## Deletion in peptides
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$Deletion_In_Peptide)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Deletion_In_Peptide],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$Deletion_In_Peptide)==0) cat("No proteins with peptide in Deletion\n")
+}
 ```
 
 ## Peptide not in BLAST
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$Deletion_In_Peptide)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Peptide_Not_In_Blast],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$Peptide_Not_In_Blast)==0) cat("No proteins with peptide outside of blast match part\n")
+}
 ```
 
 ## mRNA Not in BLAST
 ```{r eval=params$PEPTIDES_PART}
+if(dim(MrnaOnly)[1]!=0 || sum(MrnaOnly.Informations$Not_In_Blast)){
 datatable(MrnaOnly[MrnaOnly$Name %in% rownames(MrnaOnly.Informations)[MrnaOnly.Informations$Not_In_Blast],],
           escape=FALSE,
           rownames=FALSE,
           extensions = 'Responsive',
           options=list(columnDefs=list(list(className="none",targets=5))))
+}else{
+if(dim(MrnaOnly)[1]==0) cat("No proteins from mRNA from Protein\n")
+if(sum(MrnaOnly.Informations$Not_In_Blast)==0) cat("No proteins whithout blast match\n")
+}
 ```
 
 
@@ -1595,4 +1649,48 @@ sessionInfo()
 ```
 
 
+```{r}
+ProteinBank.Names<-names(ProteinBank)
+SP_Canonical<-ProteinBank.Names[
+  intersect(
+    grep("^sp",ProteinBank.Names),
+    grep("-[0-9]*\\|",ProteinBank.Names,invert=TRUE))]
+SP_Canonical.Short<-gsub(" .*","",SP_Canonical)
+BlastNames<-ProteinBank.Names[
+  grep("Blast=",ProteinBank.Names)]
+BlastHitNames<-gsub(".*Blast=","",BlastNames)
+SP_Canonical.NoMrna.Short<-SP_Canonical.Short[!SP_Canonical.Short %in% BlastHitNames]
+SP_Canonical.NoMrna.InMS.Short<-SP_Canonical.NoMrna.Short[SP_Canonical.NoMrna.Short %in% ProteinsInMS.NoContam]
+SP_Canonical.NoMrna.InMS.Short<-gsub(
+  "\\|.*",
+  "",
+  gsub(
+    "sp\\|",
+    "",
+    SP_Canonical.NoMrna.InMS.Short
+  )
+)
+write.table(data.frame(UNIPROT_ID=SP_Canonical.NoMrna.InMS.Short),
+            "PURE_CANONICAL.NomRNA.UNIPROT_ID.txt",
+            row.names = FALSE,
+            quote=FALSE,
+            sep="\t")
+```
+
+```{r}
+ProteinBank.Names<-names(ProteinBank)
+CommonUniprot<-ProteinBank.Names[grep("(UNIPROT|Blast)=",ProteinBank.Names)]
+CommonUniprot<-gsub("^[^\\|]*\\|",
+                    "",
+                    CommonUniprot)
+CommonUniprot<-gsub("\\|.*",
+                    "",
+                    CommonUniprot)
+
+write.table(data.frame(UNIPROT_ID=CommonUniprot),
+            "PRESENT_SPECTRO_RNASEQ.UNIPROT_ID.txt",
+            row.names = FALSE,
+            quote=FALSE,
+            sep="\t")
+```
 
