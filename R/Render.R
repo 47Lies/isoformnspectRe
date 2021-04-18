@@ -158,7 +158,7 @@ RenderAnIsoform<-function(IsoformProt,
                    "_",
                    IsoformProt)
   Rmd <- system.file("rmd",
-                     "RegularProteinSkeleton.V2.Rmd",
+                     "PerfectIsoformSkeleton.V2.Rmd",
                      package = "isoformnspectRe")
   Css <- system.file("extdata",
                      "IsoAndSpe.css",
