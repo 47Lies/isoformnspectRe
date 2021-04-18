@@ -131,7 +131,7 @@ LocalPep<-data.frame(LocalPeptides[,..PeptidesCols])
 colnames(LocalPep)<-c("Start","End","Pep","Proteins","Sequence")
 LocalPep$Proteins<-unlist(lapply(LocalPep$Proteins,function(x){paste(unlist(lapply(unlist(strsplit(split=';',x)),STRING_ProteinShortName)),collapse=" ")}))
 PerfectIsoformName<-gsub(".*UNIPROT=","",params$ProteinOfInterest)
-LocalProteinSequence<-HTML_Pretty_SequenceTT(
+LocalProteinSequence<-HTML_Pretty_Sequence(
   Sequence=as.vector(LocalProt),
   Peptides=LocalPep,
   PerfectIsoformName=PerfectIsoformName,
