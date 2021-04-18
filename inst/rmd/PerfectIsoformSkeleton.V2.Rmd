@@ -131,51 +131,11 @@ LocalPep<-data.frame(LocalPeptides[,..PeptidesCols])
 colnames(LocalPep)<-c("Start","End","Pep","Proteins","Sequence")
 LocalPep$Proteins<-unlist(lapply(LocalPep$Proteins,function(x){paste(unlist(lapply(unlist(strsplit(split=';',x)),STRING_ProteinShortName)),collapse=" ")}))
 PerfectIsoformName<-gsub(".*UNIPROT=","",params$ProteinOfInterest)
-LocalProteinSequence<-HTML_Pretty_Sequence(
+LocalProteinSequence<-HTML_Pretty_SequenceTT(
   Sequence=as.vector(LocalProt),
   Peptides=LocalPep,
   PerfectIsoformName=PerfectIsoformName,
   LineWidth=60)
-```
-
-```{r GGplotProcess, include=FALSE}
-
-TranscriptId <- gsub(",.*$",
-                     "",
-                     params$ProteinOfInterest)
-
-GeneId <- gsub(".[^.]*$",
-               "",
-               TranscriptId)
-LocalGFFDF <- GFFDF[
-  GFFDF$gene_id == GeneId & GFFDF$type == "exon", ]
-LocalGFFDF$transcript_id <- factor(
-  LocalGFFDF$transcript_id)
-Transcript_id<-levels(LocalGFFDF$transcript_id)
-TranscriptIdNewLevels<-paste(GeneId,1:length(Transcript_id),sep=".")
-LocalGFFDF$transcript_id <- factor(
-  as.vector(LocalGFFDF$transcript_id),
-  levels=TranscriptIdNewLevels)
-
-LocalGFFDF$Transcript <- as.numeric(
-  LocalGFFDF$transcript_id)
-AllKnownPositions <- paste(
-  sort(
-    unique(
-      c(LocalGFFDF$start,
-      LocalGFFDF$end
-      )
-    )
-  )
-)
-LocalGFFDF$NeoStart<-factor(
-  paste(LocalGFFDF$start),
-  levels=AllKnownPositions)
-LocalGFFDF$NeoEnd<-factor(
-  paste(LocalGFFDF$end),
-  levels=AllKnownPositions)
-
-
 ```
 
 Column {data-width=600}
